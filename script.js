@@ -1,3 +1,4 @@
+alert("JS読み込まれた！");
 const statusBox = document.getElementById("status");
 
 // 地図初期化
