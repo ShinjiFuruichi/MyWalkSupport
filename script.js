@@ -29,3 +29,25 @@ fetch("course.gpx")
     // 表示範囲調整
     map.fitBounds(polyline.getBounds());
   });
+
+// 現在地表示
+navigator.geolocation.watchPosition(position => {
+  const lat = position.coords.latitude;
+  const lon = position.coords.longitude;
+
+  const currentLatLng = [lat, lon];
+
+  // マーカー更新
+  if (window.currentMarker) {
+    window.currentMarker.setLatLng(currentLatLng);
+  } else {
+    window.currentMarker = L.circleMarker(currentLatLng, {
+      radius: 8,
+      color: "red"
+    }).addTo(map);
+  }
+
+  // 地図を現在地に追従（任意）
+  map.setView(currentLatLng, 15);
+
+});
