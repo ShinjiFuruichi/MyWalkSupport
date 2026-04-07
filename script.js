@@ -1,8 +1,12 @@
+<<<<<<< HEAD
 //alert("JS読み込まれた！");
 //仮の現在地
 const fixedCurrent = [33.01889, 129.94164];
 //const fixedCurrent = [32.8297, 130.16996];
 
+=======
+alert("JS読み込まれた！");
+>>>>>>> b6f146797aeb79564a473ea7c164fa4a796bddba
 const statusBox = document.getElementById("status");
 
 // 地図初期化
@@ -24,13 +28,18 @@ fetch("course.gpx")
     const xml = parser.parseFromString(gpxText, "text/xml");
     const trkpts = xml.getElementsByTagName("trkpt");
 
+<<<<<<< HEAD
     latlngs = [];
+=======
+    let latlngs = [];
+>>>>>>> b6f146797aeb79564a473ea7c164fa4a796bddba
     for (let i = 0; i < trkpts.length; i++) {
       const lat = parseFloat(trkpts[i].getAttribute("lat"));
       const lon = parseFloat(trkpts[i].getAttribute("lon"));
       latlngs.push([lat, lon]);
     }
 
+<<<<<<< HEAD
     waypoints = [];
 
     const wpts = xml.getElementsByTagName("wpt");
@@ -86,12 +95,19 @@ fetch("course.gpx")
     // 👇ここで呼ぶだけ
     updateCurrentPosition(latlngs);
 
+=======
+    const polyline = L.polyline(latlngs, { color: "blue" }).addTo(map);
+    map.fitBounds(polyline.getBounds());
+>>>>>>> b6f146797aeb79564a473ea7c164fa4a796bddba
   })
   .catch(err => {
     statusBox.textContent = "GPX読込エラー: " + err.message;
   });
 
+<<<<<<< HEAD
 /*
+=======
+>>>>>>> b6f146797aeb79564a473ea7c164fa4a796bddba
 // 現在地表示
 if (!navigator.geolocation) {
   statusBox.textContent = "このブラウザは位置情報非対応";
@@ -127,6 +143,7 @@ if (!navigator.geolocation) {
       maximumAge: 0
     }
   );
+<<<<<<< HEAD
 }
 */
 // 現在地取得関数（モックと実際の切り替え）
@@ -350,4 +367,6 @@ function findNextWaypoint(currentIndex, latlngs, waypoints) {
   });
 
   return next;
+=======
+>>>>>>> b6f146797aeb79564a473ea7c164fa4a796bddba
 }
