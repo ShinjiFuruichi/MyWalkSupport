@@ -9,66 +9,47 @@
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
 
-  <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-    }
-    #map {
-      width: 100%;
-      height: 100%;
-    }
-  </style>
+  <!-- CSS -->
+  <link rel="stylesheet" href="static/style.css">
 </head>
 
 <body>
   <div id="map"></div>
-  <!--
-  <div id="status" style="
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    z-index: 1000;
-    background: rgba(255,255,255,0.9);
-    padding: 8px 10px;
-    border-radius: 8px;
-    font-size: 14px;
-  ">
-  status: loading...
-  </div>
-  <div id="status"></div>
-  -->
-  
-  <div id="infoBox" style="
-  position: absolute;
-  top: 80px;
-  left: 10px;
-  background: white;
-  padding: 12px;
-  border-radius: 10px;
-  z-index: 1000;
-  font-size: 14px;
-  line-height: 1.6;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-  font-family: sans-serif;
-  min-width: 200px;
-">
-  <div id="courseName"></div>
-  <div id="progress"></div>
-  <div id="remaining"></div>
-  <div id="next"></div>
 
-  <button id="startBtn">スタート</button>
-  <button id="updateBtn" style="display:none;">現在地更新</button>
-  <button id="endBtn" style="display:none;">終了</button>
-  <div id="timeInfo"></div>
-  <div id="result"></div>
-</div>
+  <!-- スタートボタン（常に表示） -->
+  <button id="startBtn" class="floating-btn">▶</button>
+
+  <button id="updateBtn" class="hidden">↻</button>
+  <button id="endBtn" class="hidden">■</button>
+
+  <!-- 情報パネル -->
+  <div id="infoPanel" class="panel hidden">
+
+    <div id="courseName" class="panel-title"></div>
+
+    <div class="panel-section">
+      <div class="panel-title">📍 現在</div>
+      <div id="progress"></div>
+      <div id="remaining"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">🚩 次の目的地</div>
+      <div id="next"></div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">⏱ 時間</div>
+      <div id="timeInfo"></div>
+    </div>
+
+    <div id="result"></div>
+  </div>
 
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
-  <!-- GPX読み込み -->
+  <!-- JS -->
   <script src="script.js"></script>
 </body>
 </html>

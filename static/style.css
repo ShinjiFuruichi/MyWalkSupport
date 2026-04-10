@@ -1,0 +1,124 @@
+/* 画面全体 */
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+/* 地図 */
+#map {
+  width: 100%;
+  height: 100%;
+}
+
+/* パネル */
+.panel {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 14px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  font-size: 14px;
+  line-height: 1.5;
+  z-index: 1000;
+  font-family: sans-serif;
+
+  transition: all 0.2s ease;
+}
+
+/* セクション */
+.panel-section {
+  margin-bottom: 10px;
+}
+.panel-section div {
+  margin: 4px 0;
+}
+
+/* タイトル */
+.panel-title {
+  font-weight: bold;
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #ddd;
+}
+
+/* ボタンエリア */
+.panel-buttons {
+  margin-top: 10px;
+}
+
+#progress,
+#remaining,
+#next,
+#timeInfo {
+  font-size: 14px;
+  font-weight: bold;
+} 
+
+#result  {
+  font-weight: bold;
+  font-size: 16px;
+  color: #d9534f; /* 赤系 */
+}
+
+/* ボタン */
+button {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: #3498db;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+/* 押したとき */
+button:active {
+  background: #2980b9;
+  transform: scale(0.95);
+}
+
+/* 非表示 */
+.hidden {
+  display: none;
+}
+
+/* 画面右上の更新ボタン */
+.floating-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+
+/* 更新ボタンの位置調整 */
+#updateBtn {
+  position: absolute;
+  top: 10px;
+  left: 60px;
+  z-index: 1000;
+}
+
+/* 終了ボタンの位置調整 */
+#endBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+
+#startBtn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
