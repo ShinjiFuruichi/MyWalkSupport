@@ -122,3 +122,15 @@ button:active {
   left: 50%;
   transform: translate(-50%, -50%);
 }
+
+.next-stop {
+  color: #00aa00; /* 緑 */
+}
+
+.next-cp {
+  color: #00aa00; /* 緑 */
+}
+
+.next-kp {
+  color: purple;
+}

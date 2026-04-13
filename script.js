@@ -63,13 +63,20 @@ fetch("course.gpx")
       const type = typeTag ? typeTag.textContent : "UNKNOWN";
       const name = nameTag ? nameTag.textContent : "NO NAME";
 
+      const res = findNearestIndex([lat, lon], latlngs);
+
       waypoints.push({
         lat,
         lon,
         type,
-        name
+        name,
+        routeIndex: res.index
       });
     }
+
+    //
+    const distancePoints = generateDistancePoints(latlngs, 10);
+    waypoints = waypoints.concat(distancePoints);
 
     const trkNameTag = xml.getElementsByTagName("trk")[0]
                       ?.getElementsByTagName("name")[0];
@@ -90,13 +97,63 @@ fetch("course.gpx")
 
       if (wp.type === "CHECKPOINT") color = "red";
       if (wp.type === "REST AREA") color = "green";
+      if (wp.type === "DISTANCE") color = "purple";
 
       L.circleMarker([wp.lat, wp.lon], {
         radius: 6,
         color: color
       })
       .addTo(map)
-      .bindPopup(`${wp.name}<br>${wp.type}`);
+
+      
+      //.bindPopup(`${wp.name}<br>${wp.type}`);
+      // ポップアップ内容を動的にするため関数化
+      .bindPopup(() => {
+
+        if (!startTime) return `${wp.name}`;
+
+        const now = new Date();
+
+        // 予定
+        const distFromStart = getTraveledDistance(wp.routeIndex, latlngs);
+        const totalDistance = getTotalDistance(latlngs);
+        const plannedSpeed = totalDistance / (plannedDurationMs / 1000);
+
+        const plannedArrival = new Date(
+          startTime.getTime() + (distFromStart / plannedSpeed) * 1000
+        );
+
+        // 予測
+        const traveled = getTraveledDistance(currentIndex, latlngs);
+        const elapsedSec = (now - startTime) / 1000;
+
+        let predictedArrival = null;
+        let diffText = "-";
+        let color = "black";
+
+        if (elapsedSec > 0 && traveled > 0) {
+          const currentSpeed = traveled / elapsedSec;
+
+          const distToPoint =
+            getRemainingDistance(currentIndex, latlngs) -
+            getRemainingDistance(wp.routeIndex, latlngs);
+
+          predictedArrival = new Date(
+            now.getTime() + (distToPoint / currentSpeed) * 1000
+          );
+
+          const diffMs = predictedArrival - plannedArrival;
+          color = diffMs > 0 ? "red" : "blue";
+          diffText = formatDiff(diffMs);
+        }
+
+        return `
+          ${wp.name}（${(distFromStart / 1000).toFixed(1)} km）<br>
+          予測：${predictedArrival ? formatClock(predictedArrival) : "--"}<br>
+          差分：<span style="color:${color}">${diffText}</span>
+        `;
+      });
+
     });
 
     // 👇ここで呼ぶだけ
@@ -239,7 +296,7 @@ function updateCurrentPosition(latlngs) {
 
     // 表示更新
     document.getElementById("progress").textContent =
-      `距離：${(traveled / 1000).toFixed(2)} km（${percent.toFixed(1)}%）`;
+      `進捗：${(traveled / 1000).toFixed(2)} km（${percent.toFixed(1)}%）`;
     document.getElementById("remaining").textContent =
       `残り：${(remaining / 1000).toFixed(2)} km`;
 
@@ -253,6 +310,8 @@ function updateCurrentPosition(latlngs) {
       latlngs,
       waypoints
     );
+    //
+    const nextDistancePoint = findNextDistancePoint(result.index, waypoints);
 
     // 表示用テキスト
     let text = "";
@@ -262,9 +321,15 @@ function updateCurrentPosition(latlngs) {
       const distStop =
         getRemainingDistance(result.index, latlngs) -
         getRemainingDistance(nextStop.routeIndex, latlngs);
+      const distFromStart = getTraveledDistance(nextStop.routeIndex, latlngs);
 
-      text += `次：${nextStop.name}（${nextStop.type}）<br>`;
+      text += `<span class="next-stop">次：${nextStop.name}
+      （${(distFromStart / 1000).toFixed(1)} km）</span><br>`;
       text += `距離：${(distStop / 1000).toFixed(2)} km<br>`;
+
+      // 予測
+      const pred = calcPrediction(nextStop.routeIndex, result.index, latlngs, startTime, plannedDurationMs);
+      text += `予測：${pred.predicted}（<span style="color:${pred.color}">${pred.diffText}</span>）<br>`;
     }
 
     // 🔴 次のCP
@@ -272,67 +337,30 @@ function updateCurrentPosition(latlngs) {
       const distCP =
         getRemainingDistance(result.index, latlngs) -
         getRemainingDistance(nextCP.routeIndex, latlngs);
-
-      text += `次CP：${nextCP.name}<br>`;
-      text += `距離：${(distCP / 1000).toFixed(2)} km`;
-    }
-
-    if (startTime && nextCP) {
-
-      // =========================
-      // 🟦 ①予定（固定）
-      // =========================
       const distFromStart = getTraveledDistance(nextCP.routeIndex, latlngs);
 
-      const totalDistance = getTotalDistance(latlngs);
-      const totalTimeSec = plannedDurationMs / 1000;
-      const plannedSpeed = totalDistance / totalTimeSec;
+      text += `<span class="next-cp">次CP：${nextCP.name}
+      （${(distFromStart / 1000).toFixed(1)} km）</span><br>`;
+      text += `距離：${(distCP / 1000).toFixed(2)} km<br>`;
 
-      const plannedArrival = new Date(
-        startTime.getTime() + (distFromStart / plannedSpeed) * 1000
-      );
-
-      // =========================
-      // 🟩 ②予測（現在ペース）
-      // =========================
-      const traveled = getTraveledDistance(result.index, latlngs);
-      const elapsedSec = (now - startTime) / 1000;
-
-      let predictedArrival = null;
-
-      if (elapsedSec > 0 && traveled > 0) {
-        const currentSpeed = traveled / elapsedSec;
-
-        const distToCP =
-          getRemainingDistance(result.index, latlngs) -
-          getRemainingDistance(nextCP.routeIndex, latlngs);
-
-        predictedArrival = new Date(
-          now.getTime() + (distToCP / currentSpeed) * 1000
-        );
-      }
-
-      // =========================
-      // 🟥 ③差分
-      // =========================
-      let diffText = "-";
-      let color = "black";
-
-      if (predictedArrival) {
-        const diffMs = predictedArrival - plannedArrival;
-        color = diffMs > 0 ? "red" : "blue";
-
-        diffText = formatDiff(diffMs);
-      }
-
-      // =========================
-      // 🖥 表示
-      // =========================
-      text += `<br>
-        予測：${predictedArrival ? formatClock(predictedArrival) : "--"}
-        （<span style="color:${color}">${diffText}</span>）`;
+      // 予測
+      const pred = calcPrediction(nextCP.routeIndex, result.index, latlngs, startTime, plannedDurationMs);
+      text += `予測：${pred.predicted}（<span style="color:${pred.color}">${pred.diffText}</span>）<br>`;
     }
-        
+
+    if (nextDistancePoint) {
+      const dist =
+        getRemainingDistance(result.index, latlngs) -
+        getRemainingDistance(nextDistancePoint.routeIndex, latlngs);
+
+      text += `<span class="next-kp">キロP：${nextDistancePoint.name}</span><br>`;
+      text += `距離：${(dist / 1000).toFixed(2)} km<br>`;
+
+      // 予測
+      const pred = calcPrediction(nextDistancePoint.routeIndex, result.index, latlngs, startTime, plannedDurationMs);
+      text += `予測：${pred.predicted}（<span style="color:${pred.color}">${pred.diffText}</span>）<br>`;
+    }
+
     // 表示
     document.getElementById("next").innerHTML = text;
 
@@ -610,7 +638,7 @@ function findIntermediateStops(currentIndex, nextCP, latlngs, waypoints) {
   let candidates = [];
 
   waypoints.forEach(wp => {
-    if (wp.type === "CHECKPOINT") return;
+    if (wp.type === "CHECKPOINT" || wp.type === "DISTANCE") return;
 
     const res = findNearestIndex([wp.lat, wp.lon], latlngs);
 
@@ -664,6 +692,100 @@ function getNextTargets(currentIndex, latlngs, waypoints) {
   return {
     nextStop,
     nextCP
+  };
+}
+// 追加機能：距離ポイントを生成する関数
+function generateDistancePoints(latlngs, intervalKm = 10) {
+  let points = [];
+  let accumulated = 0;
+  let nextTarget = intervalKm * 1000;
+
+  for (let i = 0; i < latlngs.length - 1; i++) {
+    const d = getDistanceMeters(latlngs[i], latlngs[i + 1]);
+
+    if (accumulated + d >= nextTarget) {
+      points.push({
+        lat: latlngs[i][0],
+        lon: latlngs[i][1],
+        name: `${nextTarget / 1000}km`,
+        type: "DISTANCE",
+        routeIndex: i
+      });
+
+      nextTarget += intervalKm * 1000;
+    }
+
+    accumulated += d;
+  }
+
+  return points;
+}
+
+function findNextDistancePoint(currentIndex, waypoints) {
+  let next = null;
+  let minIndex = Infinity;
+
+  waypoints.forEach(wp => {
+    if (wp.type !== "DISTANCE") return;
+
+    if (wp.routeIndex > currentIndex && wp.routeIndex < minIndex) {
+      minIndex = wp.routeIndex;
+      next = wp;
+    }
+  });
+
+  return next;
+}
+
+function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plannedDurationMs) {
+  if (!startTime) {
+    return {
+      predicted: "--",
+      diffText: "-",
+      color: "black"
+    };
+  }
+
+  const now = new Date();
+  const elapsedSec = (now - startTime) / 1000;
+  const traveled = getTraveledDistance(currentIndex, latlngs);
+
+  if (elapsedSec <= 0 || traveled <= 0) {
+    return {
+      predicted: "--",
+      diffText: "-",
+      color: "black"
+    };
+  }
+
+  // 現在速度
+  const speed = traveled / elapsedSec;
+
+  // 残距離
+  const distToTarget =
+    getRemainingDistance(currentIndex, latlngs) -
+    getRemainingDistance(targetRouteIndex, latlngs);
+
+  // 予測到着
+  const sec = distToTarget / speed;
+  const arrival = new Date(now.getTime() + sec * 1000);
+
+  // 予定到着
+  const plannedDist = getTraveledDistance(targetRouteIndex, latlngs);
+  const totalDist = getTotalDistance(latlngs);
+  const plannedSpeed = totalDist / (plannedDurationMs / 1000);
+
+  const plannedArrival = new Date(
+    startTime.getTime() + (plannedDist / plannedSpeed) * 1000
+  );
+
+  // 差分
+  const diffMs = arrival - plannedArrival;
+
+  return {
+    predicted: formatClock(arrival),
+    diffText: formatDiff(diffMs),
+    color: diffMs > 0 ? "red" : "blue"
   };
 }
 
