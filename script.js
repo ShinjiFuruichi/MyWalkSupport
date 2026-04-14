@@ -6,6 +6,11 @@
 
 const statusBox = document.getElementById("status");
 
+const TAGS = {
+  "場所": ["CP", "エイド", "ストア", "私設", "その他"],
+  "内容": ["休憩", "トイレ", "補給", "治療", "寝る"]
+};
+
 // 地図初期化
 const map = L.map('map').setView([35.0, 135.0], 13);
 
@@ -17,6 +22,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 // グローバル変数
 let latlngs = []; // GPXの配列をグローバル化
 let waypoints = []; // ウェイポイントの配列をグローバル化
+let records = [];      // 保存済み記録
+let currentRecord = null; // 記録中
 
 let plannedDurationMs = 22 * 60 * 60 * 1000; // 22時間
 let startTime = null;
@@ -27,6 +34,7 @@ let timer = null;
 
 let lastPosition = null;
 let lastTime = null;
+let restStartTime = null;
 
 const totalDurationHours = 22; // 例
 const totalDurationMs = totalDurationHours * 3600 * 1000;
@@ -171,7 +179,8 @@ fetch("course.gpx")
       // 更新・終了は表示
       document.getElementById("updateBtn").classList.remove("hidden");
       document.getElementById("endBtn").classList.remove("hidden");
-
+      document.getElementById("tagBtn").classList.remove("hidden");
+      
       console.log("復元スタート:", startTime);
 
       timer = setInterval(() => {
@@ -568,6 +577,7 @@ document.getElementById("startBtn").onclick = () => {
   document.getElementById("startBtn").classList.add("hidden");
   document.getElementById("updateBtn").classList.remove("hidden");
   document.getElementById("endBtn").classList.remove("hidden");
+  document.getElementById("tagBtn").classList.remove("hidden");
 
   updateCurrentPosition(latlngs);
 
@@ -606,6 +616,162 @@ document.getElementById("updateBtn").onclick = () => {
   updateCurrentPosition(latlngs);
 };
 
+// タグ追加ボタン
+document.getElementById("tagBtn").onclick = () => {
+
+  const now = new Date();
+
+  // ▶ 記録開始
+  if (!currentRecord) {
+
+    if (!lastPosition) {
+      alert("位置取得中");
+      return;
+    }
+
+    currentRecord = {
+      lat: lastPosition[0],
+      lon: lastPosition[1],
+      startTime: now.toISOString(),
+      endTime: null,
+      tags: []
+    };
+
+    // UI
+    const statusEl = document.getElementById("status");
+    statusEl.textContent = "● 停止中";
+    statusEl.style.opacity = 1;
+    
+    //document.getElementById("infoPanel").classList.remove("hidden");
+    document.getElementById("tagPanel").classList.remove("hidden");
+
+    console.log("記録開始:", currentRecord);
+
+  }
+
+  // ▶ 記録終了
+  else {
+
+    currentRecord.endTime = now.toISOString();
+
+    records.push(currentRecord);
+
+    console.log("記録保存:", currentRecord);
+
+    // 地図にマーカー（開始位置）
+    L.circleMarker([currentRecord.lat, currentRecord.lon], {
+      radius: 6,
+      color: "purple"
+    })
+    .addTo(map)
+    .bindPopup(`
+      ${currentRecord.tags.join(",")}<br>
+      ${formatClock(new Date(currentRecord.startTime))} - 
+      ${formatClock(new Date(currentRecord.endTime))}
+    `);
+    resetTagUI();
+
+    // リセット
+    currentRecord = null;
+
+    // UI
+    const statusEl = document.getElementById("status");
+    statusEl.textContent = "✔ 記録保存";
+    statusEl.style.opacity = 1;
+
+    setTimeout(() => {
+      statusEl.style.opacity = 0;
+    }, 2000);
+  }
+};
+
+function resetTagUI() {
+  document.querySelectorAll("#tagPanel button")
+    .forEach(btn => btn.classList.remove("selected"));
+
+  document.getElementById("tagPanel").classList.add("hidden");
+}
+
+// タグ選択（複数選べるバージョン）
+document.querySelectorAll("#tagPanel button").forEach(btn => {
+  btn.onclick = () => {
+
+    if (!currentRecord) return;
+
+    const label = btn.dataset.type;
+
+    if (currentRecord.tags.includes(label)) {
+      currentRecord.tags =
+        currentRecord.tags.filter(t => t !== label);
+
+      btn.classList.remove("selected");
+    } else {
+      currentRecord.tags.push(label);
+      btn.classList.add("selected");
+    }
+    document.getElementById("status").textContent =
+    currentRecord.tags.join(" / ");
+
+    console.log("タグ:", currentRecord.tags);
+  };
+});
+
+function createTagUI() {
+
+  const container = document.getElementById("tagContainer");
+
+  container.innerHTML = ""; // 初期化
+
+  Object.entries(TAGS).forEach(([groupName, tags]) => {
+
+    const groupDiv = document.createElement("div");
+    groupDiv.className = "tag-group";
+
+    // タイトル
+    const title = document.createElement("div");
+    title.textContent = groupName;
+    groupDiv.appendChild(title);
+
+    // ボタン
+    tags.forEach(tag => {
+
+      const btn = document.createElement("button");
+      btn.textContent = tag;
+      btn.dataset.type = tag;
+
+      btn.onclick = () => toggleTag(btn, tag);
+
+      groupDiv.appendChild(btn);
+    });
+
+    container.appendChild(groupDiv);
+  });
+}
+
+function toggleTag(btn, label) {
+
+  if (!currentRecord) return;
+
+  if (currentRecord.tags.includes(label)) {
+    currentRecord.tags =
+      currentRecord.tags.filter(t => t !== label);
+
+    btn.classList.remove("selected");
+  } else {
+    currentRecord.tags.push(label);
+    btn.classList.add("selected");
+  }
+
+  document.getElementById("status").textContent =
+    currentRecord.tags.join(" / ");
+}
+
+document.getElementById("closeTag").onclick = () => {
+  document.getElementById("tagPanel").classList.add("hidden");
+};
+
+createTagUI();
+
 document.getElementById("infoPanel").onclick = () => {
   document.getElementById("infoPanel").classList.add("hidden");
 
@@ -632,6 +798,7 @@ function findNextCP(currentIndex, latlngs, waypoints) {
 
   return nextCP;
 }
+
 
 // 現在地と次のチェックポイントの間にあるウェイポイントを探す関数
 function findIntermediateStops(currentIndex, nextCP, latlngs, waypoints) {

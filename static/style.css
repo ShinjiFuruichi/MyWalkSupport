@@ -10,6 +10,28 @@ html, body {
   height: 100%;
 }
 
+/* ステータス表示 */
+#status {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  background: black;
+  color: white;
+
+  padding: 6px 12px;
+  border-radius: 8px;
+
+  z-index: 2000;
+
+  font-size: 14px;
+  font-weight: bold;
+
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
 /* パネル */
 .panel {
   position: absolute;
@@ -92,6 +114,13 @@ button:active {
   display: none;
 }
 
+#startBtn,
+#updateBtn,
+#endBtn,
+#tagBtn {
+  z-index: 1100;
+}
+
 /* 画面右上の更新ボタン */
 .floating-btn {
   position: absolute;
@@ -123,6 +152,81 @@ button:active {
   transform: translate(-50%, -50%);
 }
 
+.tag-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.tag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+}
+
+.tag-panel {
+  position: absolute;
+  bottom: 80px;
+
+  left: 50%;
+  transform: translateX(-50%);
+
+  width: 90%;
+  max-width: 400px;
+
+  background: rgba(0,0,0,0.85);
+  color: white;
+
+  padding: 12px;
+  border-radius: 10px;
+
+  z-index: 1500;
+}
+
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-panel button {
+  width: auto;
+  height: auto;
+
+  padding: 6px 10px;
+  font-size: 14px;
+
+  border-radius: 6px;
+}
+
+.tag-panel button.selected {
+  background: orange;
+}
+
+#tagMenu button {
+  margin: 5px;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+#tagMenu button.selected {
+  background-color: orange;
+  color: white;
+  transform: scale(1.1);
+}
+
+#tagBtn {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+}
+
 .next-stop {
   color: #00aa00; /* 緑 */
 }
@@ -134,3 +238,4 @@ button:active {
 .next-kp {
   color: purple;
 }
+

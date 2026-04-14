@@ -16,11 +16,14 @@
 <body>
   <div id="map"></div>
 
+  <div id="status"></div>
+
   <!-- スタートボタン（常に表示） -->
   <button id="startBtn" class="floating-btn">▶</button>
 
   <button id="updateBtn" class="hidden">↻</button>
   <button id="endBtn" class="hidden">■</button>
+  <button id="tagBtn" class="hidden">📍</button>
 
   <!-- 情報パネル -->
   <div id="infoPanel" class="panel hidden">
@@ -44,6 +47,18 @@
     </div>
 
     <div id="result"></div>
+  </div>
+
+  <!-- タグメニュー -->
+  <div id="tagPanel" class="tag-panel hidden">
+
+    <div class="tag-header">
+      <div class="tag-title">📍 タグ選択</div>
+      <button id="closeTag" class="close-btn">✕</button>
+    </div>
+
+    <div id="tagContainer"></div>
+
   </div>
 
   <!-- Leaflet -->
