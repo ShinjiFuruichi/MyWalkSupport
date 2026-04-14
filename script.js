@@ -1,8 +1,6 @@
-//alert("JS読み込まれた！");
-//仮の現在地
-//const fixedCurrent = [33.01889, 129.94164];
-//const fixedCurrent = [32.8297, 130.16996];
-//const fixedCurrent = [35.44967, 136.08832];
+// 現在地取得関数（モックと実際の切り替え）
+let useMockLocation = false;
+let mockIndex = 0;
 
 const statusBox = document.getElementById("status");
 
@@ -190,19 +188,41 @@ fetch("course.gpx")
     } else {
       // 初期状態
       document.getElementById("startBtn").classList.remove("hidden");
-
       document.getElementById("updateBtn").classList.add("hidden");
       document.getElementById("endBtn").classList.add("hidden");
     }
+    // ===== 地図に復元表示 =====
+    const saved = localStorage.getItem("records");
 
+    if (saved) {
+      records = JSON.parse(saved);
+    }
+
+    records.forEach(r => {
+      L.circleMarker([r.lat, r.lon], {
+        radius: 6,
+        color: "purple"
+      })
+      .addTo(map)
+      .bindPopup(`
+        ${r.tags.join(" / ")}<br>
+        ${formatClock(new Date(r.startTime))} -
+        ${formatClock(new Date(r.endTime))}
+      `);
+    });
   })
+  
   .catch(err => {
     statusBox.textContent = "GPX読込エラー: " + err.message;
   });
 
-// 現在地取得関数（モックと実際の切り替え）
-let useMockLocation = true;
-let mockIndex = 0;
+  // ===== 保存データ読み込み =====
+  const saved = localStorage.getItem("records");
+
+  if (saved) {
+    records = JSON.parse(saved);
+    console.log("復元:", records);
+  }
 
 function getCurrentLocation(callback) {
   if (useMockLocation) {
@@ -655,6 +675,8 @@ document.getElementById("tagBtn").onclick = () => {
     currentRecord.endTime = now.toISOString();
 
     records.push(currentRecord);
+    localStorage.setItem("records", JSON.stringify(records));
+    downloadJSON();
 
     console.log("記録保存:", currentRecord);
 
@@ -692,6 +714,7 @@ function resetTagUI() {
   document.getElementById("tagPanel").classList.add("hidden");
 }
 
+/*
 // タグ選択（複数選べるバージョン）
 document.querySelectorAll("#tagPanel button").forEach(btn => {
   btn.onclick = () => {
@@ -715,6 +738,7 @@ document.querySelectorAll("#tagPanel button").forEach(btn => {
     console.log("タグ:", currentRecord.tags);
   };
 });
+*/
 
 function createTagUI() {
 
@@ -769,6 +793,11 @@ function toggleTag(btn, label) {
 document.getElementById("closeTag").onclick = () => {
   document.getElementById("tagPanel").classList.add("hidden");
 };
+
+// データ保存（JSONダウンロード）
+//document.getElementById("saveBtn").onclick = downloadJSON;
+//
+document.getElementById("clearBtn").onclick = clearRecords;
 
 createTagUI();
 
@@ -954,6 +983,36 @@ function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plan
     diffText: formatDiff(diffMs),
     color: diffMs > 0 ? "red" : "blue"
   };
+}
+
+// データダウンロード
+function downloadJSON() {
+  if (records.length === 0) return;
+
+  const data = JSON.stringify(records, null, 2);
+
+  const blob = new Blob([data], {
+    type: "application/json"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+
+  // 👇 固定ファイル名（上書き狙い）
+  a.download = "walk_record.json";
+
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function clearRecords() {
+  if (!confirm("記録をすべて削除しますか？")) return;
+
+  localStorage.removeItem("records");
+  location.reload();
 }
 
 //デバッグ用リセットボタン

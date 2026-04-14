@@ -170,6 +170,46 @@ button:active {
   font-size: 18px;
 }
 
+/*
+#saveBtn {
+  position: absolute;
+  bottom: 90px;
+  right: 20px;
+
+  width: auto;
+  height: auto;
+
+  padding: 8px 12px;
+
+  background: black;
+  color: white;
+
+  border-radius: 8px;
+
+  z-index: 2000;
+}
+*/
+
+#clearBtn {
+  position: absolute;
+  bottom: 150px;  /* ←保存より上 */
+  right: 20px;
+
+  width: auto;
+  height: auto;
+
+  padding: 8px 12px;
+
+  background: #444;
+  color: white;
+
+  border-radius: 8px;
+
+  z-index: 2000;
+}
+
+
+/* タグ選択パネル */
 .tag-panel {
   position: absolute;
   bottom: 80px;
