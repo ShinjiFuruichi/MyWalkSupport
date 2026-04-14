@@ -1,6 +1,6 @@
 // 現在地取得関数（モックと実際の切り替え）
 let useMockLocation = false;
-let mockIndex = 0;
+let TargetHour = 1.2; // 目標時間（例: 22時間）
 
 const statusBox = document.getElementById("status");
 
@@ -23,9 +23,9 @@ let waypoints = []; // ウェイポイントの配列をグローバル化
 let records = [];      // 保存済み記録
 let currentRecord = null; // 記録中
 
-let plannedDurationMs = 22 * 60 * 60 * 1000; // 22時間
+let plannedDurationMs = TargetHour * 60 * 60 * 1000; // 22時間
 let startTime = null;
-let goalTime = null;
+let goalTi
 let endTime = null;
 let currentIndex = 0;
 let timer = null;
@@ -34,7 +34,7 @@ let lastPosition = null;
 let lastTime = null;
 let restStartTime = null;
 
-const totalDurationHours = 22; // 例
+const totalDurationHours = TargetHour; // 例
 const totalDurationMs = totalDurationHours * 3600 * 1000;
 
 // ページ読み込み時にスタート時間を削除（デバッグ用）
@@ -178,7 +178,9 @@ fetch("course.gpx")
       document.getElementById("updateBtn").classList.remove("hidden");
       document.getElementById("endBtn").classList.remove("hidden");
       document.getElementById("tagBtn").classList.remove("hidden");
-      
+     
+      document.getElementById("clearBtn").classList.add("hidden");
+
       console.log("復元スタート:", startTime);
 
       timer = setInterval(() => {
@@ -190,6 +192,7 @@ fetch("course.gpx")
       document.getElementById("startBtn").classList.remove("hidden");
       document.getElementById("updateBtn").classList.add("hidden");
       document.getElementById("endBtn").classList.add("hidden");
+      document.getElementById("clearBtn").classList.remove("hidden");
     }
     // ===== 地図に復元表示 =====
     const saved = localStorage.getItem("records");
@@ -224,6 +227,7 @@ fetch("course.gpx")
     console.log("復元:", records);
   }
 
+let mockIndex = 0;
 function getCurrentLocation(callback) {
   if (useMockLocation) {
     const point = latlngs[mockIndex];
@@ -598,6 +602,7 @@ document.getElementById("startBtn").onclick = () => {
   document.getElementById("updateBtn").classList.remove("hidden");
   document.getElementById("endBtn").classList.remove("hidden");
   document.getElementById("tagBtn").classList.remove("hidden");
+  document.getElementById("clearBtn").classList.add("hidden");
 
   updateCurrentPosition(latlngs);
 
@@ -794,8 +799,6 @@ document.getElementById("closeTag").onclick = () => {
   document.getElementById("tagPanel").classList.add("hidden");
 };
 
-// データ保存（JSONダウンロード）
-//document.getElementById("saveBtn").onclick = downloadJSON;
 //
 document.getElementById("clearBtn").onclick = clearRecords;
 
