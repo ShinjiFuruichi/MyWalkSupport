@@ -1,5 +1,6 @@
 // 現在地取得関数（モックと実際の切り替え）
-let useMockLocation = false;
+//let useMockLocation = false; // スマホ実地モード
+let useMockLocation = true; // PCモックモード
 let TargetHour = 1.2; // 目標時間（例: 22時間）
 
 const statusBox = document.getElementById("status");
@@ -21,18 +22,18 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let latlngs = []; // GPXの配列をグローバル化
 let waypoints = []; // ウェイポイントの配列をグローバル化
 let records = [];      // 保存済み記録
-let currentRecord = null; // 記録中
+let currentRecord = null; // 現在記録中のもの
 
-let plannedDurationMs = TargetHour * 60 * 60 * 1000; // 22時間
-let startTime = null;
-let goalTi
-let endTime = null;
-let currentIndex = 0;
-let timer = null;
+let plannedDurationMs = TargetHour * 60 * 60 * 1000; // 予定時間（例: 22時間）
+let startTime = null; // スタート時間
+let goalTime = null;  // ゴール予定時間
+let endTime = null;   // 終了時間
+let currentIndex = 0; // 現在のインデックス
+let timer = null;     // 位置自動更新用タイマー
 
-let lastPosition = null;
-let lastTime = null;
-let restStartTime = null;
+let lastPosition = null; // 最後の位置
+let lastTime = null;     // 最後の時間
+let restStartTime = null; // 休憩開始時間
 
 const totalDurationHours = TargetHour; // 例
 const totalDurationMs = totalDurationHours * 3600 * 1000;
@@ -80,7 +81,7 @@ fetch("course.gpx")
       });
     }
 
-    //
+    // 距離ポイントを生成してwaypointsに追加
     const distancePoints = generateDistancePoints(latlngs, 10);
     waypoints = waypoints.concat(distancePoints);
 
@@ -111,8 +112,6 @@ fetch("course.gpx")
       })
       .addTo(map)
 
-      
-      //.bindPopup(`${wp.name}<br>${wp.type}`);
       // ポップアップ内容を動的にするため関数化
       .bindPopup(() => {
 
@@ -162,7 +161,7 @@ fetch("course.gpx")
 
     });
 
-    // 👇ここで呼ぶだけ
+    // 最初の位置とUI更新
     updateCurrentPosition(latlngs);
 
     // ページ読み込み時にスタート時間が保存されていれば復元
@@ -178,14 +177,16 @@ fetch("course.gpx")
       document.getElementById("updateBtn").classList.remove("hidden");
       document.getElementById("endBtn").classList.remove("hidden");
       document.getElementById("tagBtn").classList.remove("hidden");
-     
+    
       document.getElementById("clearBtn").classList.add("hidden");
 
       console.log("復元スタート:", startTime);
 
-      timer = setInterval(() => {
-        updateCurrentPosition(latlngs);
-      }, 3000);
+      if (useMockLocation) {
+        timer = setInterval(() => {
+          refreshPositionAndUI();
+        }, 3000);
+      }
 
     } else {
       // 初期状態
@@ -228,6 +229,7 @@ fetch("course.gpx")
   }
 
 let mockIndex = 0;
+// 現在地取得関数
 function getCurrentLocation(callback) {
   if (useMockLocation) {
     const point = latlngs[mockIndex];
@@ -255,6 +257,7 @@ function getCurrentLocation(callback) {
   }
 }
 
+// 位置とUIを更新する関数
 function updateCurrentPosition(latlngs) {
   getCurrentLocation(current => {
     const now = new Date();
@@ -444,8 +447,17 @@ function updateCurrentPosition(latlngs) {
   });
 }
 
+// 位置とUIを更新する関数
+function refreshPositionAndUI() {
+  updateCurrentPosition(latlngs);
+
+  // 必要ならここでパネル更新
+  // updateInfoPanel();
+}
+
 //let currentIndex = 0;
 
+// モック位置更新関数
 function simulatePosition() {
   if (latlngs.length === 0) return;
 
@@ -519,6 +531,7 @@ function getRemainingDistance(index, latlngs) {
   return total; // メートル
 }
 
+// 総距離計算関数
 function getTotalDistance(latlngs) {
   let total = 0;
 
@@ -529,6 +542,7 @@ function getTotalDistance(latlngs) {
   return total;
 }
 
+// 進んだ距離計算関数
 function getTraveledDistance(index, latlngs) {
   let total = 0;
 
@@ -538,6 +552,8 @@ function getTraveledDistance(index, latlngs) {
 
   return total;
 }
+
+// 次のチェックポイントを探す関数
 function findNextWaypoint(currentIndex, latlngs, waypoints) {
   let next = null;
   let minIndex = Infinity;
@@ -607,16 +623,21 @@ document.getElementById("startBtn").onclick = () => {
   updateCurrentPosition(latlngs);
 
   // 3秒ごとに位置自動更新
-  timer = setInterval(() => {
-    updateCurrentPosition(latlngs);
-  }, 3000);
+  if (useMockLocation) {
+    timer = setInterval(() => {
+      refreshPositionAndUI();
+    }, 3000);
+  }
 };
 
 // 終了ボタン
 document.getElementById("endBtn").onclick = () => {
   endTime = new Date();
 
-  clearInterval(timer);
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
 
   // ローカルストレージからスタート時間を削除
   localStorage.removeItem("startTime");
@@ -634,16 +655,29 @@ document.getElementById("endBtn").onclick = () => {
 document.getElementById("updateBtn").onclick = () => {
   const panel = document.getElementById("infoPanel");
 
-  // 常に開く
   panel.classList.remove("hidden");
 
   // 情報更新
-  updateCurrentPosition(latlngs);
+  refreshPositionAndUI();
+};
+
+//
+document.getElementById("saveBtn").onclick = () => {
+  downloadJSON();
+
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "💾 保存しました";
+  statusEl.style.opacity = 1;
+
+  setTimeout(() => {
+    statusEl.style.opacity = 0;
+  }, 2000);
 };
 
 // タグ追加ボタン
 document.getElementById("tagBtn").onclick = () => {
 
+  refreshPositionAndUI();
   const now = new Date();
 
   // ▶ 記録開始
@@ -681,7 +715,6 @@ document.getElementById("tagBtn").onclick = () => {
 
     records.push(currentRecord);
     localStorage.setItem("records", JSON.stringify(records));
-    downloadJSON();
 
     console.log("記録保存:", currentRecord);
 
@@ -712,6 +745,7 @@ document.getElementById("tagBtn").onclick = () => {
   }
 };
 
+// タグUIリセット関数
 function resetTagUI() {
   document.querySelectorAll("#tagPanel button")
     .forEach(btn => btn.classList.remove("selected"));
@@ -719,36 +753,10 @@ function resetTagUI() {
   document.getElementById("tagPanel").classList.add("hidden");
 }
 
-/*
-// タグ選択（複数選べるバージョン）
-document.querySelectorAll("#tagPanel button").forEach(btn => {
-  btn.onclick = () => {
-
-    if (!currentRecord) return;
-
-    const label = btn.dataset.type;
-
-    if (currentRecord.tags.includes(label)) {
-      currentRecord.tags =
-        currentRecord.tags.filter(t => t !== label);
-
-      btn.classList.remove("selected");
-    } else {
-      currentRecord.tags.push(label);
-      btn.classList.add("selected");
-    }
-    document.getElementById("status").textContent =
-    currentRecord.tags.join(" / ");
-
-    console.log("タグ:", currentRecord.tags);
-  };
-});
-*/
-
+// タグUI生成関数
 function createTagUI() {
 
   const container = document.getElementById("tagContainer");
-
   container.innerHTML = ""; // 初期化
 
   Object.entries(TAGS).forEach(([groupName, tags]) => {
@@ -777,6 +785,7 @@ function createTagUI() {
   });
 }
 
+// タグ選択トグル関数
 function toggleTag(btn, label) {
 
   if (!currentRecord) return;
@@ -795,15 +804,17 @@ function toggleTag(btn, label) {
     currentRecord.tags.join(" / ");
 }
 
+// タグパネルを閉じるボタン
 document.getElementById("closeTag").onclick = () => {
   document.getElementById("tagPanel").classList.add("hidden");
 };
 
-//
+// 記録クリアボタン
 document.getElementById("clearBtn").onclick = clearRecords;
 
 createTagUI();
 
+// 情報パネルを閉じるボタン
 document.getElementById("infoPanel").onclick = () => {
   document.getElementById("infoPanel").classList.add("hidden");
 
@@ -830,7 +841,6 @@ function findNextCP(currentIndex, latlngs, waypoints) {
 
   return nextCP;
 }
-
 
 // 現在地と次のチェックポイントの間にあるウェイポイントを探す関数
 function findIntermediateStops(currentIndex, nextCP, latlngs, waypoints) {
@@ -893,6 +903,7 @@ function getNextTargets(currentIndex, latlngs, waypoints) {
     nextCP
   };
 }
+
 // 追加機能：距離ポイントを生成する関数
 function generateDistancePoints(latlngs, intervalKm = 10) {
   let points = [];
@@ -920,6 +931,7 @@ function generateDistancePoints(latlngs, intervalKm = 10) {
   return points;
 }
 
+// 次の距離ポイントを探す関数
 function findNextDistancePoint(currentIndex, waypoints) {
   let next = null;
   let minIndex = Infinity;
@@ -936,6 +948,7 @@ function findNextDistancePoint(currentIndex, waypoints) {
   return next;
 }
 
+// 予測計算関数
 function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plannedDurationMs) {
   if (!startTime) {
     return {
@@ -1011,6 +1024,7 @@ function downloadJSON() {
   URL.revokeObjectURL(url);
 }
 
+// 記録クリア関数
 function clearRecords() {
   if (!confirm("記録をすべて削除しますか？")) return;
 
