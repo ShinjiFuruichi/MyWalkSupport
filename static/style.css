@@ -81,13 +81,13 @@ html, body {
 #remaining,
 #next,
 #timeInfo {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: bold;
 } 
 
 #result  {
   font-weight: bold;
-  font-size: 16px;
+  font-size: 18px;
   color: #d9534f; /* 赤系 */
 }
 
@@ -219,7 +219,7 @@ button:active {
   left: 50%;
   transform: translateX(-50%);
 
-  width: 90%;
+  width: 94%;
   max-width: 400px;
 
   background: rgba(0,0,0,0.85);
@@ -286,7 +286,7 @@ button:active {
 
   bottom: 20px;     /* ← 少し上に浮かせる */
   left: 1%;         /* ← 左右に余白 */
-  width: 88%;       /* ← 横幅縮める */
+  width: 86%;       /* ← 横幅縮める */
   height: 140px;
 
   background: linear-gradient(
@@ -317,3 +317,81 @@ button:active {
   z-index: 1300;
 }
 
+#fileSelector {
+  position: absolute;
+  top: 10px;
+  left: 60px;
+  z-index: 1000;
+
+  background: white;
+  padding: 6px 10px;
+  border-radius: 8px;
+
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+#fileSelector input {
+  display: none;
+}
+
+.fileBtn {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #4CAF50;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fileBtn:hover {
+  background: #45a049;
+}
+
+#setupPanel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  background: rgba(0,0,0,0.4);
+  z-index: 2000;
+
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+
+.setupBox {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.setupBox input {
+  width: 80px;
+  margin: 10px;
+  font-size: 16px;
+}
+
+.setupBox button {
+  width: 100%;              /* 横いっぱい */
+  padding: 10px 0;          /* 縦の余白 */
+  margin-top: 10px;
+
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+
+  background: #4CAF50;
+  color: white;
+  cursor: pointer;
+}
+
+.setupBox button:hover {
+  background: #45a049;
+}
+
+.setupBox button:active {
+  transform: scale(0.98);
+}

@@ -1,14 +1,19 @@
+//
+// ===== 初期化 =====
+//
+
 // 現在地取得関数（モックと実際の切り替え）
-//let useMockLocation = false; // スマホ実地モード
-let useMockLocation = true; // PCモックモード
+let useMockLocation = false; // スマホ実地モード
+//let useMockLocation = true; // PCモックモード
 let TargetHour = 22; // 目標時間（例: 22時間）
+let targetMin = 0;   // 目標分（例: 0分）
 let ContourInterval = 100
 
 const statusBox = document.getElementById("status");
 
 const TAGS = {
   "場所": ["CP", "エイド", "ストア", "私設", "その他"],
-  "内容": ["休憩", "トイレ", "補給", "治療", "寝る"]
+  "内容": ["休憩", "トイレ", "補給", "治療", "寝る", "支援"]
 };
 
 // 地図初期化
@@ -36,233 +41,499 @@ let lastPosition = null; // 最後の位置
 let lastTime = null;     // 最後の時間
 let restStartTime = null; // 休憩開始時間
 
+let mockIndex = 0; // モック位置のインデックス
+
 const totalDurationHours = TargetHour; // 例
 const totalDurationMs = totalDurationHours * 3600 * 1000;
 
-// ページ読み込み時にスタート時間を削除（デバッグ用）
-localStorage.removeItem("startTime");
 
+//
+// ===== データ読み込み、解析、復元 =====
+//
+
+// ページ読み込み時にスタート時間を削除（デバッグ用）
+if (useMockLocation) {
+  localStorage.removeItem("startTime");
+  localStorage.removeItem("goalTime");
+}
+
+const savedHour = localStorage.getItem("targetHour");
+const savedMin = localStorage.getItem("targetMin");
+
+
+if (savedHour) {
+  document.getElementById("targetHourInput").value = savedHour;
+}
+if (savedMin) {
+  document.getElementById("targetMinInput").value = savedMin;
+}
+
+/*
 // GPX読み込み
 fetch("course.gpx")
   .then(res => res.text())
   .then(gpxText => {
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(gpxText, "text/xml");
-    const trkpts = xml.getElementsByTagName("trkpt");
-
-    latlngs = [];
-    for (let i = 0; i < trkpts.length; i++) {
-      const lat = parseFloat(trkpts[i].getAttribute("lat"));
-      const lon = parseFloat(trkpts[i].getAttribute("lon"));
-      const eleTag = trkpts[i].getElementsByTagName("ele")[0];
-      const ele = eleTag ? parseFloat(eleTag.textContent) : 0;
-
-      latlngs.push({
-        lat: lat,
-        lon: lon,
-        ele: ele
-      });
-    }
-
-    waypoints = [];
-
-    const wpts = xml.getElementsByTagName("wpt");
-
-    for (let i = 0; i < wpts.length; i++) {
-      const lat = parseFloat(wpts[i].getAttribute("lat"));
-      const lon = parseFloat(wpts[i].getAttribute("lon"));
-
-      const typeTag = wpts[i].getElementsByTagName("type")[0];
-      const nameTag = wpts[i].getElementsByTagName("name")[0];
-
-      const type = typeTag ? typeTag.textContent : "UNKNOWN";
-      const name = nameTag ? nameTag.textContent : "NO NAME";
-
-      const res = findNearestIndex([lat, lon], latlngs);
-
-      waypoints.push({
-        lat,
-        lon,
-        type,
-        name,
-        routeIndex: res.index
-      });
-    }
-
-    // 距離ポイントを生成してwaypointsに追加
-    const distancePoints = generateDistancePoints(latlngs, 10);
-    waypoints = waypoints.concat(distancePoints);
-
-    const trkNameTag = xml.getElementsByTagName("trk")[0]
-                      ?.getElementsByTagName("name")[0];
-
-    const courseName = trkNameTag
-      ? trkNameTag.textContent
-      : "NO NAME";
-
-    console.log("コース名:", courseName);
-
-    document.getElementById("courseName").textContent = courseName;
-
-    const polyline = L.polyline(
-      latlngs.map(p => [p.lat, p.lon]),
-      { color: "blue" }
-    ).addTo(map);
-    map.fitBounds(polyline.getBounds());
-
-    waypoints.forEach(wp => {
-      let color = "blue";
-
-      if (wp.type === "CHECKPOINT") color = "red";
-      if (wp.type === "REST AREA") color = "green";
-      if (wp.type === "DISTANCE") color = "purple";
-
-      L.circleMarker([wp.lat, wp.lon], {
-        radius: 6,
-        color: color
-      })
-      .addTo(map)
-
-      // ポップアップ内容を動的にするため関数化
-      .bindPopup(() => {
-
-        if (!startTime) return `${wp.name}`;
-
-        const now = new Date();
-
-        // 予定
-        const distFromStart = getTraveledDistance(wp.routeIndex, latlngs);
-        const totalDistance = getTotalDistance(latlngs);
-        const plannedSpeed = totalDistance / (plannedDurationMs / 1000);
-
-        const plannedArrival = new Date(
-          startTime.getTime() + (distFromStart / plannedSpeed) * 1000
-        );
-
-        // 予測
-        const traveled = getTraveledDistance(currentIndex, latlngs);
-        const elapsedSec = (now - startTime) / 1000;
-
-        let predictedArrival = null;
-        let diffText = "-";
-        let color = "black";
-
-        if (elapsedSec > 0 && traveled > 0) {
-          const currentSpeed = traveled / elapsedSec;
-
-          const distToPoint =
-            getRemainingDistance(currentIndex, latlngs) -
-            getRemainingDistance(wp.routeIndex, latlngs);
-
-          predictedArrival = new Date(
-            now.getTime() + (distToPoint / currentSpeed) * 1000
-          );
-
-          const diffMs = predictedArrival - plannedArrival;
-          color = diffMs > 0 ? "red" : "blue";
-          diffText = formatDiff(diffMs);
-        }
-
-        return `
-          ${wp.name}（${(distFromStart / 1000).toFixed(1)} km）<br>
-          予測：${predictedArrival ? formatClock(predictedArrival) : "--"}<br>
-          差分：<span style="color:${color}">${diffText}</span>
-        `;
-      });
-
-    });
-
-    // 最初の位置とUI更新
-    updateCurrentPosition(latlngs);
-
-    // 標高グラフクリックで斜度表示
-    const canvas = document.getElementById("elevationChart");
-
-    canvas.addEventListener("click", (e) => {
-      console.log("クリックOK");
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-
-      const index = Math.floor(
-        (x / rect.width) * latlngs.length
-      );
-
-      const safeIndex = Math.max(1, Math.min(latlngs.length - 2, index));
-
-      const slope = getSlopePercent(safeIndex, latlngs);
-      const ele = latlngs[safeIndex].ele;
-      showSlopePopup(e.clientX, e.clientY, slope, ele);
-    });
-
-    // 標高グラフ描画
-    const elevations = getElevations(latlngs);
-    drawElevation(elevations, 0);
-
-    // ページ読み込み時にスタート時間が保存されていれば復元
-    const savedStart = localStorage.getItem("startTime");
-
-    if (savedStart) {
-      startTime = new Date(savedStart);
-
-      // スタートは隠す
-      document.getElementById("startBtn").classList.add("hidden");
-
-      // 更新・終了は表示
-      document.getElementById("updateBtn").classList.remove("hidden");
-      document.getElementById("endBtn").classList.remove("hidden");
-      document.getElementById("tagBtn").classList.remove("hidden");
-    
-      document.getElementById("clearBtn").classList.add("hidden");
-
-      console.log("復元スタート:", startTime);
-
-      if (useMockLocation) {
-        timer = setInterval(() => {
-          refreshPositionAndUI();
-        }, 3000);
-      }
-
-    } else {
-      // 初期状態
-      document.getElementById("startBtn").classList.remove("hidden");
-      document.getElementById("updateBtn").classList.add("hidden");
-      document.getElementById("endBtn").classList.add("hidden");
-      document.getElementById("clearBtn").classList.remove("hidden");
-    }
-    // ===== 地図に復元表示 =====
-    const saved = localStorage.getItem("records");
-
-    if (saved) {
-      records = JSON.parse(saved);
-    }
-
-    records.forEach(r => {
-      L.circleMarker([r.lat, r.lon], {
-        radius: 6,
-        color: "purple"
-      })
-      .addTo(map)
-      .bindPopup(`
-        ${r.tags.join(" / ")}<br>
-        ${formatClock(new Date(r.startTime))} -
-        ${formatClock(new Date(r.endTime))}
-      `);
-    });
+    loadGPX(gpxText);
   })
-  
   .catch(err => {
     statusBox.textContent = "GPX読込エラー: " + err.message;
   });
+*/
 
-  // ===== 保存データ読み込み =====
+// ファイル選択イベント
+document.getElementById("gpxFileInput").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = (event) => {
+    const gpxText = event.target.result;
+
+    loadGPX(gpxText);
+    document.getElementById("fileSelector").style.display = "none";
+    document.getElementById("setupPanel").style.display = "flex";
+  };
+
+  reader.readAsText(file);
+});
+
+//
+document.getElementById("startSetupBtn").onclick = () => {
+  const hour = Number(document.getElementById("targetHourInput").value)|| 0;
+  const min = Number(document.getElementById("targetMinInput").value)|| 0;
+
+  if (hour < 0 || min < 0) {
+    alert("正しい時間を入力してね");
+    return;
+  }
+
+  const totalHour = hour + (min / 60);
+
+  plannedDurationMs = totalHour * 60 * 60 * 1000;
+
+  // 表示
+  document.getElementById("targetDisplay").textContent =
+    `設定：${hour}時間 ${min}分`;
+
+  // 保存
+  localStorage.setItem("targetHour", hour);
+  localStorage.setItem("targetMin", min);
+
+  document.getElementById("setupPanel").style.display = "none";
+};
+
+// ===== 保存データ読み込み =====
+loadRecords();
+document.getElementById("setupPanel").style.display = "none";
+
+//
+// ===== イベント =====
+//
+
+// スタートボタン
+document.getElementById("startBtn").onclick = () => {
+  startTime = new Date();
+  goalTime = new Date(startTime.getTime() + plannedDurationMs);
+
+  // ローカルストレージにスタート時間を保存
+  localStorage.setItem("startTime", startTime.toISOString());
+  localStorage.setItem("goalTime", goalTime.toISOString());
+
+  document.getElementById("startBtn").classList.add("hidden");
+  document.getElementById("updateBtn").classList.remove("hidden");
+  document.getElementById("endBtn").classList.remove("hidden");
+  document.getElementById("tagBtn").classList.remove("hidden");
+  document.getElementById("clearBtn").classList.add("hidden");
+
+  updateCurrentPosition(latlngs);
+
+  // 3秒ごとに位置自動更新
+  if (useMockLocation) {
+    timer = setInterval(() => {
+      refreshPositionAndUI();
+    }, 3000);
+  }
+};
+
+// 終了ボタン
+document.getElementById("endBtn").onclick = () => {
+  endTime = new Date();
+
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+
+  // ローカルストレージからスタート時間を削除
+  localStorage.removeItem("startTime");
+
+  const totalTimeMs = endTime - startTime;
+  const traveled = getTraveledDistance(currentIndex, latlngs);
+
+  document.getElementById("result").textContent =
+    `総時間: ${formatTime(totalTimeMs)} / 総距離: ${(traveled/1000).toFixed(2)} km`;
+
+  console.log("終了:", endTime);
+};
+
+// 更新ボタン
+document.getElementById("updateBtn").onclick = () => {
+  const panel = document.getElementById("infoPanel");
+
+  panel.classList.remove("hidden");
+
+  // 情報更新
+  refreshPositionAndUI();
+};
+
+//
+document.getElementById("saveBtn").onclick = () => {
+  downloadJSON();
+
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "💾 保存しました";
+  statusEl.style.opacity = 1;
+
+  setTimeout(() => {
+    statusEl.style.opacity = 0;
+  }, 2000);
+};
+
+// 標高グラフ表示トグル
+document.getElementById("elevationBtn").onclick = () => {
+  document.getElementById("elevationContainer")
+    .classList.toggle("hidden");
+
+  const elevations = getElevations(latlngs);
+  drawElevation(elevations, currentIndex);
+};
+
+// タグ追加ボタン
+document.getElementById("tagBtn").onclick = () => {
+
+  refreshPositionAndUI();
+  const now = new Date();
+
+  // ▶ 記録開始
+  if (!currentRecord) {
+
+    if (!lastPosition) {
+      alert("位置取得中");
+      return;
+    }
+
+    currentRecord = {
+      lat: lastPosition[0],
+      lon: lastPosition[1],
+      ele: latlngs[currentIndex].ele,
+      startTime: now.toISOString(),
+      endTime: null,
+      tags: []
+    };
+
+    // UI
+    const statusEl = document.getElementById("status");
+    statusEl.textContent = "● 停止中";
+    statusEl.style.opacity = 1;
+    
+    //document.getElementById("infoPanel").classList.remove("hidden");
+    document.getElementById("tagPanel").classList.remove("hidden");
+
+    console.log("記録開始:", currentRecord);
+
+  }
+
+  // ▶ 記録終了
+  else {
+
+    currentRecord.endTime = now.toISOString();
+
+    records.push(currentRecord);
+    localStorage.setItem("records", JSON.stringify(records));
+
+    console.log("記録保存:", currentRecord);
+
+    // 地図にマーカー（開始位置）
+    L.circleMarker([currentRecord.lat, currentRecord.lon], {
+      radius: 6,
+      color: "purple"
+    })
+    .addTo(map)
+    .bindPopup(`
+      ${currentRecord.tags.join(",")}<br>
+      ${formatClock(new Date(currentRecord.startTime))} - 
+      ${formatClock(new Date(currentRecord.endTime))}
+    `);
+    resetTagUI();
+
+    // リセット
+    currentRecord = null;
+
+    // UI
+    const statusEl = document.getElementById("status");
+    statusEl.textContent = "✔ 記録保存";
+    statusEl.style.opacity = 1;
+
+    setTimeout(() => {
+      statusEl.style.opacity = 0;
+    }, 2000);
+  }
+};
+
+// タグパネルを閉じるボタン
+document.getElementById("closeTag").onclick = () => {
+  document.getElementById("tagPanel").classList.add("hidden");
+};
+
+// 記録クリアボタン
+document.getElementById("clearBtn").onclick = clearRecords;
+
+createTagUI();
+
+// 情報パネルを閉じるボタン
+document.getElementById("infoPanel").onclick = () => {
+  document.getElementById("infoPanel").classList.add("hidden");
+};
+
+
+
+//
+// ===== データ保存・復元関数 =====
+//
+
+//
+function loadRecords() {
   const saved = localStorage.getItem("records");
-
   if (saved) {
     records = JSON.parse(saved);
     console.log("復元:", records);
   }
+}
 
-let mockIndex = 0;
+//
+// ===== GPX処理 =====
+//
+
+// GPX読み込み関数
+function loadGPX(gpxText) {
+
+  // ===== 既存レイヤー削除（現在地などは残す）=====
+  map.eachLayer(layer => {
+    if (
+      layer instanceof L.Polyline ||
+      layer instanceof L.CircleMarker
+    ) {
+      if (
+        layer !== window.currentMarker &&
+        layer !== window.nearestMarker &&
+        layer !== window.snapLine
+      ) {
+        map.removeLayer(layer);
+      }
+    }
+  });
+  records = [];
+  localStorage.removeItem("records");
+
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(gpxText, "text/xml");
+  const trkpts = xml.getElementsByTagName("trkpt");
+
+  latlngs = [];
+  for (let i = 0; i < trkpts.length; i++) {
+    const lat = parseFloat(trkpts[i].getAttribute("lat"));
+    const lon = parseFloat(trkpts[i].getAttribute("lon"));
+    const eleTag = trkpts[i].getElementsByTagName("ele")[0];
+    const ele = eleTag ? parseFloat(eleTag.textContent) : 0;
+
+    latlngs.push({
+      lat: lat,
+      lon: lon,
+      ele: ele
+    });
+  }
+
+  waypoints = [];
+
+  const wpts = xml.getElementsByTagName("wpt");
+
+  for (let i = 0; i < wpts.length; i++) {
+    const lat = parseFloat(wpts[i].getAttribute("lat"));
+    const lon = parseFloat(wpts[i].getAttribute("lon"));
+
+    const typeTag = wpts[i].getElementsByTagName("type")[0];
+    const nameTag = wpts[i].getElementsByTagName("name")[0];
+
+    const type = typeTag ? typeTag.textContent : "UNKNOWN";
+    const name = nameTag ? nameTag.textContent : "NO NAME";
+
+    const res = findNearestIndex([lat, lon], latlngs);
+
+    waypoints.push({
+      lat,
+      lon,
+      type,
+      name,
+      routeIndex: res.index
+    });
+  }
+
+  // 距離ポイントを生成してwaypointsに追加
+  const distancePoints = generateDistancePoints(latlngs, 10);
+  waypoints = waypoints.concat(distancePoints);
+
+  const trkNameTag = xml.getElementsByTagName("trk")[0]
+                    ?.getElementsByTagName("name")[0];
+
+  const courseName = trkNameTag
+    ? trkNameTag.textContent
+    : "NO NAME";
+
+  console.log("コース名:", courseName);
+
+  document.getElementById("courseName").textContent = courseName;
+
+  const polyline = L.polyline(
+    latlngs.map(p => [p.lat, p.lon]),
+    { color: "blue" }
+  ).addTo(map);
+  map.fitBounds(polyline.getBounds());
+
+  waypoints.forEach(wp => {
+    let color = "blue";
+
+    if (wp.type === "CHECKPOINT") color = "red";
+    if (wp.type === "REST AREA") color = "green";
+    if (wp.type === "DISTANCE") color = "purple";
+
+    L.circleMarker([wp.lat, wp.lon], {
+      radius: 6,
+      color: color
+    })
+    .addTo(map)
+
+    // ポップアップ内容を動的にするため関数化
+    .bindPopup(() => {
+
+      if (!startTime) return `${wp.name}`;
+
+      const now = new Date();
+
+      // 予定
+      const distFromStart = getTraveledDistance(wp.routeIndex, latlngs);
+      const totalDistance = getTotalDistance(latlngs);
+      const plannedSpeed = totalDistance / (plannedDurationMs / 1000);
+
+      const plannedArrival = new Date(
+        startTime.getTime() + (distFromStart / plannedSpeed) * 1000
+      );
+
+      // 予測
+      const traveled = getTraveledDistance(currentIndex, latlngs);
+      const elapsedSec = (now - startTime) / 1000;
+
+      let predictedArrival = null;
+      let diffText = "-";
+      let color = "black";
+
+      if (elapsedSec > 0 && traveled > 0) {
+        const currentSpeed = traveled / elapsedSec;
+
+        const distToPoint =
+          getRemainingDistance(currentIndex, latlngs) -
+          getRemainingDistance(wp.routeIndex, latlngs);
+
+        predictedArrival = new Date(
+          now.getTime() + (distToPoint / currentSpeed) * 1000
+        );
+
+        const diffMs = predictedArrival - plannedArrival;
+        color = diffMs > 0 ? "red" : "blue";
+        diffText = formatDiff(diffMs);
+      }
+
+      return `
+        ${wp.name}（${(distFromStart / 1000).toFixed(1)} km）<br>
+        予測：${predictedArrival ? formatClock(predictedArrival) : "--"}<br>
+        差分：<span style="color:${color}">${diffText}</span>
+      `;
+    });
+
+  });
+
+  // 最初の位置とUI更新
+  updateCurrentPosition(latlngs);
+
+  // 標高グラフクリックで斜度表示
+  const canvas = document.getElementById("elevationChart");
+
+  canvas.addEventListener("click", (e) => {
+    console.log("クリックOK");
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+
+    const index = Math.floor(
+      (x / rect.width) * latlngs.length
+    );
+
+    const safeIndex = Math.max(1, Math.min(latlngs.length - 2, index));
+
+    const slope = getSlopePercent(safeIndex, latlngs);
+    const ele = latlngs[safeIndex].ele;
+    showSlopePopup(e.clientX, e.clientY, slope, ele);
+  });
+
+  // 標高グラフ描画
+  const elevations = getElevations(latlngs);
+  drawElevation(elevations, 0);
+
+  // ページ読み込み時にスタート時間が保存されていれば復元
+  const savedStart = localStorage.getItem("startTime");
+
+  if (savedStart) {
+    startTime = new Date(savedStart);
+
+    // スタートは隠す
+    document.getElementById("startBtn").classList.add("hidden");
+
+    // 更新・終了は表示
+    document.getElementById("updateBtn").classList.remove("hidden");
+    document.getElementById("endBtn").classList.remove("hidden");
+    document.getElementById("tagBtn").classList.remove("hidden");
+  
+    document.getElementById("clearBtn").classList.add("hidden");
+
+    console.log("復元スタート:", startTime);
+
+    if (useMockLocation) {
+      timer = setInterval(() => {
+        refreshPositionAndUI();
+      }, 3000);
+    }
+
+  } else {
+    // 初期状態
+    document.getElementById("startBtn").classList.remove("hidden");
+    document.getElementById("updateBtn").classList.add("hidden");
+    document.getElementById("endBtn").classList.add("hidden");
+    document.getElementById("clearBtn").classList.remove("hidden");
+  }
+
+  records.forEach(r => {
+    L.circleMarker([r.lat, r.lon], {
+      radius: 6,
+      color: "purple"
+    })
+    .addTo(map)
+    .bindPopup(`
+      ${r.tags.join(" / ")}<br>
+      ${formatClock(new Date(r.startTime))} -
+      ${formatClock(new Date(r.endTime))}
+    `);
+  });
+}
+
 // 現在地取得関数
 function getCurrentLocation(callback) {
   if (useMockLocation) {
@@ -684,7 +955,7 @@ function drawElevation(elevations, currentIndex) {
   ctx.stroke();
 }
 
-//
+// 斜度計算関数
 function getSlopePercent(index, latlngs) {
   if (index <= 0 || index >= latlngs.length - 1) return 0;
 
@@ -762,6 +1033,7 @@ function formatTime(ms) {
   const m = Math.floor((totalSec % 3600) / 60);
   return `${h}時間${m}分`;
 }
+
 // 時間表示関数（短縮版）
 function formatClock(date) {
   return date.toLocaleTimeString([], {
@@ -769,6 +1041,7 @@ function formatClock(date) {
     minute: '2-digit'
   });
 }
+
 // 時間表示関数（経過・残り用）
 function formatDuration(ms) {
   const totalSec = Math.floor(ms / 1000);
@@ -776,6 +1049,7 @@ function formatDuration(ms) {
   const m = Math.floor((totalSec % 3600) / 60);
   return `${h}時間${m.toString().padStart(2, '0')}分`;
 }
+
 // 時間表示関数（差分用）
 function formatDiff(ms) {
   const sec = Math.floor(ms / 1000);
@@ -787,156 +1061,6 @@ function formatDiff(ms) {
 
   return `${sign}${h}時間${m.toString().padStart(2, '0')}分`;
 }
-
-// スタートボタン
-document.getElementById("startBtn").onclick = () => {
-  startTime = new Date();
-  goalTime = new Date(startTime.getTime() + plannedDurationMs);
-
-  // ローカルストレージにスタート時間を保存
-  localStorage.setItem("startTime", startTime.toISOString());
-  localStorage.setItem("goalTime", goalTime.toISOString());
-
-  document.getElementById("startBtn").classList.add("hidden");
-  document.getElementById("updateBtn").classList.remove("hidden");
-  document.getElementById("endBtn").classList.remove("hidden");
-  document.getElementById("tagBtn").classList.remove("hidden");
-  document.getElementById("clearBtn").classList.add("hidden");
-
-  updateCurrentPosition(latlngs);
-
-  // 3秒ごとに位置自動更新
-  if (useMockLocation) {
-    timer = setInterval(() => {
-      refreshPositionAndUI();
-    }, 3000);
-  }
-};
-
-// 終了ボタン
-document.getElementById("endBtn").onclick = () => {
-  endTime = new Date();
-
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
-
-  // ローカルストレージからスタート時間を削除
-  localStorage.removeItem("startTime");
-
-  const totalTimeMs = endTime - startTime;
-  const traveled = getTraveledDistance(currentIndex, latlngs);
-
-  document.getElementById("result").textContent =
-    `総時間: ${formatTime(totalTimeMs)} / 総距離: ${(traveled/1000).toFixed(2)} km`;
-
-  console.log("終了:", endTime);
-};
-
-// 更新ボタン
-document.getElementById("updateBtn").onclick = () => {
-  const panel = document.getElementById("infoPanel");
-
-  panel.classList.remove("hidden");
-
-  // 情報更新
-  refreshPositionAndUI();
-};
-
-//
-document.getElementById("saveBtn").onclick = () => {
-  downloadJSON();
-
-  const statusEl = document.getElementById("status");
-  statusEl.textContent = "💾 保存しました";
-  statusEl.style.opacity = 1;
-
-  setTimeout(() => {
-    statusEl.style.opacity = 0;
-  }, 2000);
-};
-
-// 標高グラフ表示トグル
-document.getElementById("elevationBtn").onclick = () => {
-  document.getElementById("elevationContainer")
-    .classList.toggle("hidden");
-
-  const elevations = getElevations(latlngs);
-  drawElevation(elevations, currentIndex);
-};
-
-// タグ追加ボタン
-document.getElementById("tagBtn").onclick = () => {
-
-  refreshPositionAndUI();
-  const now = new Date();
-
-  // ▶ 記録開始
-  if (!currentRecord) {
-
-    if (!lastPosition) {
-      alert("位置取得中");
-      return;
-    }
-
-    currentRecord = {
-      lat: lastPosition[0],
-      lon: lastPosition[1],
-      ele: latlngs[currentIndex].ele,
-      startTime: now.toISOString(),
-      endTime: null,
-      tags: []
-    };
-
-    // UI
-    const statusEl = document.getElementById("status");
-    statusEl.textContent = "● 停止中";
-    statusEl.style.opacity = 1;
-    
-    //document.getElementById("infoPanel").classList.remove("hidden");
-    document.getElementById("tagPanel").classList.remove("hidden");
-
-    console.log("記録開始:", currentRecord);
-
-  }
-
-  // ▶ 記録終了
-  else {
-
-    currentRecord.endTime = now.toISOString();
-
-    records.push(currentRecord);
-    localStorage.setItem("records", JSON.stringify(records));
-
-    console.log("記録保存:", currentRecord);
-
-    // 地図にマーカー（開始位置）
-    L.circleMarker([currentRecord.lat, currentRecord.lon], {
-      radius: 6,
-      color: "purple"
-    })
-    .addTo(map)
-    .bindPopup(`
-      ${currentRecord.tags.join(",")}<br>
-      ${formatClock(new Date(currentRecord.startTime))} - 
-      ${formatClock(new Date(currentRecord.endTime))}
-    `);
-    resetTagUI();
-
-    // リセット
-    currentRecord = null;
-
-    // UI
-    const statusEl = document.getElementById("status");
-    statusEl.textContent = "✔ 記録保存";
-    statusEl.style.opacity = 1;
-
-    setTimeout(() => {
-      statusEl.style.opacity = 0;
-    }, 2000);
-  }
-};
 
 // タグUIリセット関数
 function resetTagUI() {
@@ -997,22 +1121,6 @@ function toggleTag(btn, label) {
     currentRecord.tags.join(" / ");
 }
 
-// タグパネルを閉じるボタン
-document.getElementById("closeTag").onclick = () => {
-  document.getElementById("tagPanel").classList.add("hidden");
-};
-
-// 記録クリアボタン
-document.getElementById("clearBtn").onclick = clearRecords;
-
-createTagUI();
-
-// 情報パネルを閉じるボタン
-document.getElementById("infoPanel").onclick = () => {
-  document.getElementById("infoPanel").classList.add("hidden");
-
-  // ここで保存処理（必要なら）
-};
 // 次のチェックポイントを探す関数
 function findNextCP(currentIndex, latlngs, waypoints) {
   let nextCP = null;

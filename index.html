@@ -14,6 +14,22 @@
 </head>
 
 <body>
+  <div id="fileSelector">
+    <label for="gpxFileInput" class="fileBtn">コース選択</label>
+    <input type="file" id="gpxFileInput" accept=".gpx">
+  </div>
+
+  <div id="setupPanel">
+    <div class="setupBox">
+      <div>目標時間（時間）</div>
+      <input type="number" id="targetHourInput" value="22" min="0"> 時間
+      <input type="number" id="targetMinInput" value="0" min="0" max="59"> 分
+      <button id="startSetupBtn">設定</button>
+    </div>
+  </div>
+
+  <div id="targetDisplay"></div>
+
   <div id="map"></div>
 
   <div id="status"></div>
