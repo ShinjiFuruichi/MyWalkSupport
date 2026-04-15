@@ -177,7 +177,7 @@ button:active {
 
 #saveBtn {
   position: absolute;
-  bottom: 180px;
+  top: 100px;
   right: 10px;
 
   width: auto;
