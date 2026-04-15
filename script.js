@@ -1,7 +1,8 @@
 // 現在地取得関数（モックと実際の切り替え）
 //let useMockLocation = false; // スマホ実地モード
 let useMockLocation = true; // PCモックモード
-let TargetHour = 1.2; // 目標時間（例: 22時間）
+let TargetHour = 22; // 目標時間（例: 22時間）
+let ContourInterval = 100
 
 const statusBox = document.getElementById("status");
 
@@ -53,7 +54,14 @@ fetch("course.gpx")
     for (let i = 0; i < trkpts.length; i++) {
       const lat = parseFloat(trkpts[i].getAttribute("lat"));
       const lon = parseFloat(trkpts[i].getAttribute("lon"));
-      latlngs.push([lat, lon]);
+      const eleTag = trkpts[i].getElementsByTagName("ele")[0];
+      const ele = eleTag ? parseFloat(eleTag.textContent) : 0;
+
+      latlngs.push({
+        lat: lat,
+        lon: lon,
+        ele: ele
+      });
     }
 
     waypoints = [];
@@ -96,7 +104,10 @@ fetch("course.gpx")
 
     document.getElementById("courseName").textContent = courseName;
 
-    const polyline = L.polyline(latlngs, { color: "blue" }).addTo(map);
+    const polyline = L.polyline(
+      latlngs.map(p => [p.lat, p.lon]),
+      { color: "blue" }
+    ).addTo(map);
     map.fitBounds(polyline.getBounds());
 
     waypoints.forEach(wp => {
@@ -163,6 +174,29 @@ fetch("course.gpx")
 
     // 最初の位置とUI更新
     updateCurrentPosition(latlngs);
+
+    // 標高グラフクリックで斜度表示
+    const canvas = document.getElementById("elevationChart");
+
+    canvas.addEventListener("click", (e) => {
+      console.log("クリックOK");
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+
+      const index = Math.floor(
+        (x / rect.width) * latlngs.length
+      );
+
+      const safeIndex = Math.max(1, Math.min(latlngs.length - 2, index));
+
+      const slope = getSlopePercent(safeIndex, latlngs);
+      const ele = latlngs[safeIndex].ele;
+      showSlopePopup(e.clientX, e.clientY, slope, ele);
+    });
+
+    // 標高グラフ描画
+    const elevations = getElevations(latlngs);
+    drawElevation(elevations, 0);
 
     // ページ読み込み時にスタート時間が保存されていれば復元
     const savedStart = localStorage.getItem("startTime");
@@ -234,7 +268,7 @@ function getCurrentLocation(callback) {
   if (useMockLocation) {
     const point = latlngs[mockIndex];
 
-    callback(point);
+    callback([point.lat, point.lon]);
 
     mockIndex += 5; // ←スピード調整
 
@@ -285,7 +319,14 @@ function updateCurrentPosition(latlngs) {
     const result = findNearestIndex(current, latlngs);
     currentIndex = result.index;
 
-    const nearestPoint = latlngs[result.index];
+    const nearestPoint = [
+      latlngs[result.index].lat,
+      latlngs[result.index].lon
+    ];
+
+    // 標高グラフ更新
+    const elevations = getElevations(latlngs);
+    drawElevation(elevations, currentIndex);
 
     // 緑（現在地）
     if (window.currentMarker) {
@@ -506,8 +547,10 @@ function findNearestIndex(current, latlngs) {
   let nearestIndex = 0;
 
   for (let i = 0; i < latlngs.length; i++) {
-    const dist = getDistanceMeters(current, latlngs[i]);
-
+    const dist = getDistanceMeters(
+      current,
+      [latlngs[i].lat, latlngs[i].lon]
+    );
     if (dist < minDist) {
       minDist = dist;
       nearestIndex = i;
@@ -525,7 +568,10 @@ function getRemainingDistance(index, latlngs) {
   let total = 0;
 
   for (let i = index; i < latlngs.length - 1; i++) {
-    total += getDistanceMeters(latlngs[i], latlngs[i + 1]);
+    total += getDistanceMeters(
+      [latlngs[i].lat, latlngs[i].lon],
+      [latlngs[i+1].lat, latlngs[i+1].lon]
+    )
   }
 
   return total; // メートル
@@ -536,7 +582,10 @@ function getTotalDistance(latlngs) {
   let total = 0;
 
   for (let i = 0; i < latlngs.length - 1; i++) {
-    total += getDistanceMeters(latlngs[i], latlngs[i + 1]);
+    total += getDistanceMeters(
+      [latlngs[i].lat, latlngs[i].lon],
+      [latlngs[i+1].lat, latlngs[i+1].lon]
+    );
   }
 
   return total;
@@ -547,10 +596,144 @@ function getTraveledDistance(index, latlngs) {
   let total = 0;
 
   for (let i = 0; i < index; i++) {
-    total += getDistanceMeters(latlngs[i], latlngs[i + 1]);
+    total += getDistanceMeters(
+      [latlngs[i].lat, latlngs[i].lon],
+      [latlngs[i+1].lat, latlngs[i+1].lon]
+    )
   }
 
   return total;
+}
+
+// 標高配列取得関数
+function getElevations(latlngs) {
+  return latlngs.map(p => p.ele);
+}
+
+// 標高グラフ描画関数
+function drawElevation(elevations, currentIndex) {
+  const canvas = document.getElementById("elevationChart");
+  const ctx = canvas.getContext("2d");
+
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const max = Math.max(...elevations);
+  const min = Math.min(...elevations);
+
+  ctx.clearRect(0, 0, w, h);
+
+  // ===== 横グリッド（100mごと） =====
+  ctx.beginPath();
+
+  const step = ContourInterval; // 100mごと
+
+  // 最小・最大を100m単位に丸める
+  const start = Math.floor(min / step) * step;
+  const end = Math.ceil(max / step) * step;
+
+  for (let ele = start; ele <= end; ele += step) {
+    const y = h - ((ele - min) / (max - min)) * h;
+
+    ctx.moveTo(0, y);
+    ctx.lineTo(w, y);
+  }
+
+  // 薄い線
+  ctx.strokeStyle = "rgba(0,0,0,0.1)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ===== 山グラフ =====
+  ctx.beginPath();
+
+  elevations.forEach((ele, i) => {
+    const x = (i / elevations.length) * w;
+    const y = h - ((ele - min) / (max - min)) * h;
+
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+
+  // グラデーション
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, "rgba(34,139,34,0.4)");
+  grad.addColorStop(1, "rgba(34,139,34,0.05)");
+
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // 輪郭
+  ctx.strokeStyle = "rgb(20,100,20)";
+  ctx.stroke();
+
+  // ===== 現在地ライン =====
+  const x = (currentIndex / elevations.length) * w;
+
+  ctx.beginPath();
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, h);
+
+  //ctx.strokeStyle = "red";
+  ctx.strokeStyle = "rgba(255,0,0,0.8)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+//
+function getSlopePercent(index, latlngs) {
+  if (index <= 0 || index >= latlngs.length - 1) return 0;
+
+  const p1 = latlngs[index - 1];
+  const p2 = latlngs[index + 1];
+
+  const dist = getDistanceMeters(
+    [p1.lat, p1.lon],
+    [p2.lat, p2.lon]
+  );
+
+  const elevDiff = p2.ele - p1.ele;
+
+  if (dist === 0) return 0;
+
+  return (elevDiff / dist) * 100;
+}
+
+// スロープポップアップ表示関数
+function showSlopePopup(x, y, slope, ele) {
+  let popup = document.getElementById("slopePopup");
+
+  if (!popup) {
+    popup = document.createElement("div");
+    popup.id = "slopePopup";
+    document.body.appendChild(popup);
+
+    popup.style.position = "absolute";
+    popup.style.background = "white";
+    popup.style.padding = "6px 10px";
+    popup.style.borderRadius = "8px";
+    popup.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)";
+    popup.style.fontSize = "14px";
+    popup.style.zIndex = 3000;
+    popup.style.pointerEvents = "none";
+  }
+
+  popup.style.left = x + "px";
+  popup.style.top = (y - 40) + "px";
+
+  const type = slope >= 0 ? "登り" : "下り";
+
+  popup.innerHTML = `
+    ${type}<br>
+    斜度：${slope.toFixed(1)}%<br>
+    標高：${Math.round(ele)} m
+  `;
+
+  setTimeout(() => popup.remove(), 2000);
 }
 
 // 次のチェックポイントを探す関数
@@ -674,6 +857,15 @@ document.getElementById("saveBtn").onclick = () => {
   }, 2000);
 };
 
+// 標高グラフ表示トグル
+document.getElementById("elevationBtn").onclick = () => {
+  document.getElementById("elevationContainer")
+    .classList.toggle("hidden");
+
+  const elevations = getElevations(latlngs);
+  drawElevation(elevations, currentIndex);
+};
+
 // タグ追加ボタン
 document.getElementById("tagBtn").onclick = () => {
 
@@ -691,6 +883,7 @@ document.getElementById("tagBtn").onclick = () => {
     currentRecord = {
       lat: lastPosition[0],
       lon: lastPosition[1],
+      ele: latlngs[currentIndex].ele,
       startTime: now.toISOString(),
       endTime: null,
       tags: []
@@ -911,12 +1104,15 @@ function generateDistancePoints(latlngs, intervalKm = 10) {
   let nextTarget = intervalKm * 1000;
 
   for (let i = 0; i < latlngs.length - 1; i++) {
-    const d = getDistanceMeters(latlngs[i], latlngs[i + 1]);
+    const d = getDistanceMeters(
+      [latlngs[i].lat, latlngs[i].lon],
+      [latlngs[i+1].lat, latlngs[i+1].lon]
+    )
 
     if (accumulated + d >= nextTarget) {
       points.push({
-        lat: latlngs[i][0],
-        lon: latlngs[i][1],
+        lat: latlngs[i].lat,
+        lon: latlngs[i].lon,
         name: `${nextTarget / 1000}km`,
         type: "DISTANCE",
         routeIndex: i
