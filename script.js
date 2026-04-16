@@ -3,8 +3,8 @@
 //
 
 // 現在地取得関数（モックと実際の切り替え）
-let useMockLocation = false; // スマホ実地モード
-//let useMockLocation = true; // PCモックモード
+//let useMockLocation = false; // スマホ実地モード
+let useMockLocation = true; // PCモックモード
 let TargetHour = 22; // 目標時間（例: 22時間）
 let targetMin = 0;   // 目標分（例: 0分）
 let ContourInterval = 100
@@ -68,20 +68,12 @@ if (savedMin) {
   document.getElementById("targetMinInput").value = savedMin;
 }
 
-/*
-// GPX読み込み
-fetch("course.gpx")
-  .then(res => res.text())
-  .then(gpxText => {
-    loadGPX(gpxText);
-  })
-  .catch(err => {
-    statusBox.textContent = "GPX読込エラー: " + err.message;
-  });
-*/
-
 // ファイル選択イベント
 document.getElementById("gpxFileInput").addEventListener("change", (e) => {
+
+  // 既存データ・レイヤーをリセット
+  resetAllState();
+
   const file = e.target.files[0];
   if (!file) return;
 
@@ -115,6 +107,7 @@ document.getElementById("startSetupBtn").onclick = () => {
   // 表示
   document.getElementById("targetDisplay").textContent =
     `設定：${hour}時間 ${min}分`;
+  document.getElementById("targetDisplay").classList.remove("hidden");
 
   // 保存
   localStorage.setItem("targetHour", hour);
@@ -138,13 +131,15 @@ document.getElementById("startBtn").onclick = () => {
 
   // ローカルストレージにスタート時間を保存
   localStorage.setItem("startTime", startTime.toISOString());
-  localStorage.setItem("goalTime", goalTime.toISOString());
-
+  localStorage.setItem("goalTime", goalTime.toISOString())
+  
   document.getElementById("startBtn").classList.add("hidden");
+  document.getElementById("saveBtn").classList.remove("hidden");
   document.getElementById("updateBtn").classList.remove("hidden");
   document.getElementById("endBtn").classList.remove("hidden");
   document.getElementById("tagBtn").classList.remove("hidden");
-  document.getElementById("clearBtn").classList.add("hidden");
+  document.getElementById("quickBtn").classList.remove("hidden");
+  document.getElementById("listBtn").classList.remove("hidden");
 
   updateCurrentPosition(latlngs);
 
@@ -173,6 +168,11 @@ document.getElementById("endBtn").onclick = () => {
 
   document.getElementById("result").textContent =
     `総時間: ${formatTime(totalTimeMs)} / 総距離: ${(traveled/1000).toFixed(2)} km`;
+  
+  if (records.length > 0) {
+    downloadJSON(true);
+  }
+
 
   console.log("終了:", endTime);
 };
@@ -189,7 +189,7 @@ document.getElementById("updateBtn").onclick = () => {
 
 //
 document.getElementById("saveBtn").onclick = () => {
-  downloadJSON();
+  downloadJSON(false);
 
   const statusEl = document.getElementById("status");
   statusEl.textContent = "💾 保存しました";
@@ -213,89 +213,157 @@ document.getElementById("elevationBtn").onclick = () => {
 document.getElementById("tagBtn").onclick = () => {
 
   refreshPositionAndUI();
-  const now = new Date();
 
-  // ▶ 記録開始
-  if (!currentRecord) {
-
-    if (!lastPosition) {
-      alert("位置取得中");
-      return;
-    }
-
-    currentRecord = {
-      lat: lastPosition[0],
-      lon: lastPosition[1],
-      ele: latlngs[currentIndex].ele,
-      startTime: now.toISOString(),
-      endTime: null,
-      tags: []
-    };
-
-    // UI
-    const statusEl = document.getElementById("status");
-    statusEl.textContent = "● 停止中";
-    statusEl.style.opacity = 1;
-    
-    //document.getElementById("infoPanel").classList.remove("hidden");
-    document.getElementById("tagPanel").classList.remove("hidden");
-
-    console.log("記録開始:", currentRecord);
-
+  if (!lastPosition) {
+    alert("位置取得中");
+    return;
   }
 
-  // ▶ 記録終了
-  else {
+  // タグ初期化
+  currentRecord = {
+    tags: []
+  };
 
-    currentRecord.endTime = now.toISOString();
-
-    records.push(currentRecord);
-    localStorage.setItem("records", JSON.stringify(records));
-
-    console.log("記録保存:", currentRecord);
-
-    // 地図にマーカー（開始位置）
-    L.circleMarker([currentRecord.lat, currentRecord.lon], {
-      radius: 6,
-      color: "purple"
-    })
-    .addTo(map)
-    .bindPopup(`
-      ${currentRecord.tags.join(",")}<br>
-      ${formatClock(new Date(currentRecord.startTime))} - 
-      ${formatClock(new Date(currentRecord.endTime))}
-    `);
-    resetTagUI();
-
-    // リセット
-    currentRecord = null;
-
-    // UI
-    const statusEl = document.getElementById("status");
-    statusEl.textContent = "✔ 記録保存";
-    statusEl.style.opacity = 1;
-
-    setTimeout(() => {
-      statusEl.style.opacity = 0;
-    }, 2000);
-  }
+  document.getElementById("infoPanel").classList.add("hidden");
+  document.getElementById("tagPanel").classList.remove("hidden");
 };
 
 // タグパネルを閉じるボタン
 document.getElementById("closeTag").onclick = () => {
+
+  if (!currentRecord || currentRecord.tags.length === 0) {
+    document.getElementById("tagPanel").classList.add("hidden");
+    currentRecord = null;
+
+    const statusEl = document.getElementById("status");
+    statusEl.textContent = "キャンセル";
+    statusEl.style.opacity = 1;
+
+    setTimeout(() => {
+      statusEl.style.opacity = 0;
+    }, 1500);
+
+    return;
+  }
+
+  const record = buildRecord(currentRecord.tags);
+  if (!record) return;
+  record.id = Date.now();
+  records.push(record);
+
+  localStorage.setItem("records", JSON.stringify(records));
+
   document.getElementById("tagPanel").classList.add("hidden");
+
+  resetTagUI();
+  currentRecord = null;
+
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "✔ タグ記録";
+  statusEl.style.opacity = 1;
+
+  setTimeout(() => {
+    statusEl.style.opacity = 0;
+  }, 1500);
+
+  const recordPanel = document.getElementById("recordPanel");
+  if (!recordPanel.classList.contains("hidden")) {
+    renderRecordList();
+  }
+
 };
 
-// 記録クリアボタン
-document.getElementById("clearBtn").onclick = clearRecords;
-
 createTagUI();
+
+// タグパネルの背景をクリックしても閉じる
+document.getElementById("tagPanel").onclick = (e) => {
+
+  e.stopPropagation();
+
+  // ボタン押しただけなら何もしない
+  if (e.target.tagName === "BUTTON") return;
+
+  if (!currentRecord || currentRecord.tags.length === 0) {
+    document.getElementById("tagPanel").classList.add("hidden");
+    currentRecord = null;
+    return;
+  }
+
+  const record = buildRecord(currentRecord.tags);
+  if (!record) return;
+
+  record.id = Date.now();
+  records.push(record);
+
+  localStorage.setItem("records", JSON.stringify(records));
+
+  document.getElementById("tagPanel").classList.add("hidden");
+
+  resetTagUI();
+  currentRecord = null;
+
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "✔ タグ記録";
+  statusEl.style.opacity = 1;
+
+  setTimeout(() => {
+    statusEl.style.opacity = 0;
+  }, 1500);
+
+  const recordPanel = document.getElementById("recordPanel");
+  if (!recordPanel.classList.contains("hidden")) {
+    renderRecordList();
+  }
+};
 
 // 情報パネルを閉じるボタン
 document.getElementById("infoPanel").onclick = () => {
   document.getElementById("infoPanel").classList.add("hidden");
 };
 
+// クイック記録ボタン
+document.getElementById("quickBtn").onclick = () => {
+
+  refreshPositionAndUI();
+
+  if (!lastPosition) {
+    alert("位置取得中");
+    return;
+  }
+
+  const record = buildRecord([]);
+  if (!record) return;
+  record.id = Date.now();
+  records.push(record);
+
+  localStorage.setItem("records", JSON.stringify(records));
+
+  const statusEl = document.getElementById("status");
+  statusEl.textContent = "✔ 記録";
+  statusEl.style.opacity = 1;
+
+  setTimeout(() => {
+    statusEl.style.opacity = 0;
+  }, 1500);
+
+  const recordPanel = document.getElementById("recordPanel");
+  if (!recordPanel.classList.contains("hidden")) {
+    renderRecordList();
+  }
+
+};
+
+// 記録リスト表示ボタン
+document.getElementById("listBtn").onclick = () => {
+  const panel = document.getElementById("recordPanel");
+
+  if (panel.classList.contains("hidden")) {
+    renderRecordList();
+    panel.classList.remove("hidden");
+  } else {
+    panel.classList.add("hidden");
+  }
+};
 
 
 //
@@ -464,6 +532,8 @@ function loadGPX(gpxText) {
 
   // 最初の位置とUI更新
   updateCurrentPosition(latlngs);
+  document.getElementById("startBtn").classList.remove("hidden");
+  document.getElementById("elevationBtn").classList.remove("hidden");
 
   // 標高グラフクリックで斜度表示
   const canvas = document.getElementById("elevationChart");
@@ -501,8 +571,9 @@ function loadGPX(gpxText) {
     document.getElementById("updateBtn").classList.remove("hidden");
     document.getElementById("endBtn").classList.remove("hidden");
     document.getElementById("tagBtn").classList.remove("hidden");
-  
-    document.getElementById("clearBtn").classList.add("hidden");
+    document.getElementById("quickBtn").classList.remove("hidden");
+    document.getElementById("saveBtn").classList.remove("hidden");
+    document.getElementById("listBtn").classList.remove("hidden");
 
     console.log("復元スタート:", startTime);
 
@@ -514,24 +585,10 @@ function loadGPX(gpxText) {
 
   } else {
     // 初期状態
-    document.getElementById("startBtn").classList.remove("hidden");
     document.getElementById("updateBtn").classList.add("hidden");
     document.getElementById("endBtn").classList.add("hidden");
-    document.getElementById("clearBtn").classList.remove("hidden");
   }
 
-  records.forEach(r => {
-    L.circleMarker([r.lat, r.lon], {
-      radius: 6,
-      color: "purple"
-    })
-    .addTo(map)
-    .bindPopup(`
-      ${r.tags.join(" / ")}<br>
-      ${formatClock(new Date(r.startTime))} -
-      ${formatClock(new Date(r.endTime))}
-    `);
-  });
 }
 
 // 現在地取得関数
@@ -1062,6 +1119,37 @@ function formatDiff(ms) {
   return `${sign}${h}時間${m.toString().padStart(2, '0')}分`;
 }
 
+// 記録用データ構築関数
+function buildRecord(tags) {
+
+  if (!startTime) {
+    alert("スタートしてから記録してください");
+    return null;
+  }
+  const now = new Date();
+
+  const traveled = getTraveledDistance(currentIndex, latlngs);
+  const elapsedSec = (now - startTime) / 1000;
+
+  // 予定との差（簡易）
+  let diffSec = 0;
+  if (goalTime) {
+    const plannedSec = plannedDurationMs / 1000;
+    diffSec = elapsedSec - plannedSec * (traveled / getTotalDistance(latlngs));
+  }
+
+  return {
+    lat: lastPosition[0],
+    lon: lastPosition[1],
+    ele: latlngs[currentIndex].ele,
+    time: now.toISOString(),
+    distance: traveled,
+    elapsed: elapsedSec,
+    diff: diffSec,
+    tags: tags
+  };
+}
+
 // タグUIリセット関数
 function resetTagUI() {
   document.querySelectorAll("#tagPanel button")
@@ -1119,7 +1207,7 @@ function toggleTag(btn, label) {
 
   document.getElementById("status").textContent =
     currentRecord.tags.join(" / ");
-}
+  }
 
 // 次のチェックポイントを探す関数
 function findNextCP(currentIndex, latlngs, waypoints) {
@@ -1306,10 +1394,20 @@ function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plan
 }
 
 // データダウンロード
-function downloadJSON() {
+function downloadJSON(withTimestamp = false) {
+
   if (records.length === 0) return;
 
-  const data = JSON.stringify(records, null, 2);
+  const courseName = document.getElementById("courseName").textContent || "course";
+
+  const dataObj = {
+    courseName: courseName,
+    startTime: startTime ? startTime.toISOString() : null,
+    endTime: endTime ? endTime.toISOString() : null,
+    records: records
+  };
+
+  const data = JSON.stringify(dataObj, null, 2);
 
   const blob = new Blob([data], {
     type: "application/json"
@@ -1320,20 +1418,97 @@ function downloadJSON() {
   const a = document.createElement("a");
   a.href = url;
 
-  // 👇 固定ファイル名（上書き狙い）
-  a.download = "walk_record.json";
+  if (withTimestamp) {
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0,16).replace(/[:T]/g, "-");
+    a.download = `${courseName}_${dateStr}.json`;
+  } else {
+    a.download = "walk_record.json";
+  }
 
   a.click();
-
   URL.revokeObjectURL(url);
 }
 
-// 記録クリア関数
-function clearRecords() {
-  if (!confirm("記録をすべて削除しますか？")) return;
+// 記録表示関数
+function renderRecordList() {
 
+  const panel = document.getElementById("recordPanel");
+  panel.innerHTML = "";
+
+  if (records.length === 0) {
+    panel.innerHTML = "記録なし";
+    return;
+  }
+
+  records.forEach(r => {
+
+    const div = document.createElement("div");
+    div.className = "record-item";
+
+    // タグテキスト
+    const tagText = r.tags.length > 0
+      ? `【${r.tags.join("・")}】`
+      : "";
+
+    // 距離
+    const dist = (r.distance / 1000).toFixed(1);
+
+    // 時刻
+    const time = new Date(r.time).toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    // 経過時間
+    const elapsed = formatDuration(r.elapsed * 1000);
+
+    // 差分
+    const diff = formatDiff(r.diff * 1000);
+
+    div.innerHTML = `
+      ${tagText}<br>
+      ${dist}km ｜ ${time} ｜ ${elapsed} ｜ 
+      <span style="color:${r.diff > 0 ? 'red' : 'blue'}">
+        ${diff}
+      </span>
+    `;
+
+    panel.appendChild(div);
+  });
+}
+
+// 記録クリア関数
+function resetAllState() {
+
+  // データ
+  records = [];
+  currentRecord = null;
+
+  // 時間
+  startTime = null;
+  goalTime = null;
+  endTime = null;
+
+  // ローカルストレージ
   localStorage.removeItem("records");
-  location.reload();
+  localStorage.removeItem("startTime");
+  localStorage.removeItem("goalTime");
+
+  // UI（ボタン状態）
+  document.getElementById("startBtn").classList.remove("hidden");
+  document.getElementById("updateBtn").classList.add("hidden");
+  document.getElementById("endBtn").classList.add("hidden");
+  document.getElementById("tagBtn").classList.add("hidden");
+  document.getElementById("quickBtn").classList.add("hidden");
+  document.getElementById("saveBtn").classList.add("hidden");
+  document.getElementById("elevationBtn").classList.add("hidden");
+  document.getElementById("targetDisplay").classList.add("hidden");
+  document.getElementById("listBtn").classList.add("hidden");
+  document.getElementById("recordPanel").classList.add("hidden");
+  document.getElementById("recordPanel").innerHTML = "";
+
+  console.log("状態リセット完了");
 }
 
 //デバッグ用リセットボタン

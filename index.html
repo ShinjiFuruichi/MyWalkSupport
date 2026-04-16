@@ -28,21 +28,21 @@
     </div>
   </div>
 
-  <div id="targetDisplay"></div>
+  <div id="targetDisplay" class="hidden"></div>
 
   <div id="map"></div>
 
   <div id="status"></div>
 
   <!-- スタートボタン（常に表示） -->
-  <button id="startBtn" class="floating-btn">▶</button>
-
+  <button id="startBtn" class="hidden">▶</button>
   <button id="updateBtn" class="hidden">↻</button>
   <button id="endBtn" class="hidden">■</button>
-  <button id="tagBtn" class="hidden">📍</button>
-  <button id="clearBtn">リセット</button>
-  <button id="saveBtn">💾</button>
-  <button id="elevationBtn">⛰</button>
+  <button id="tagBtn" class="hidden">Tag</button>
+  <button id="saveBtn" class="hidden">💾</button>
+  <button id="quickBtn" class="hidden">📍</button>
+  <button id="elevationBtn" class="hidden">⛰</button>
+  <button id="listBtn" class="hidden">📋</button>
 
   <!-- 標高グラフ -->
   <div id="elevationContainer" class="hidden">
@@ -84,6 +84,8 @@
     <div id="tagContainer"></div>
 
   </div>
+  <!-- 記録リスト -->
+  <div id="recordPanel" class="hidden record-panel"></div>
 
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
