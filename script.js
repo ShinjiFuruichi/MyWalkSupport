@@ -3,11 +3,19 @@
 //
 
 // 現在地取得関数（モックと実際の切り替え）
-//let useMockLocation = false; // スマホ実地モード
-let useMockLocation = true; // PCモックモード
+let useMockLocation = false; // スマホ実地モード
+//let useMockLocation = true; // PCモックモード
 let TargetHour = 22; // 目標時間（例: 22時間）
 let targetMin = 0;   // 目標分（例: 0分）
 let ContourInterval = 100
+
+// ===== 減衰設定 =====
+const decay100 = 0.10; // 100kmで10%ダウン
+const decay200 = 0.30; // 200kmで30%ダウン
+
+let decayA = 0;
+let decayB = 0;
+
 
 const statusBox = document.getElementById("status");
 
@@ -60,12 +68,27 @@ if (useMockLocation) {
 const savedHour = localStorage.getItem("targetHour");
 const savedMin = localStorage.getItem("targetMin");
 
-
 if (savedHour) {
   document.getElementById("targetHourInput").value = savedHour;
 }
 if (savedMin) {
   document.getElementById("targetMinInput").value = savedMin;
+}
+
+// plannedDurationMsも復元
+if (savedHour && savedMin) {
+  const totalHour = Number(savedHour) + Number(savedMin) / 60;
+  plannedDurationMs = totalHour * 60 * 60 * 1000;
+}
+
+// ★追加：起動時にGPX復元
+const savedGPX = localStorage.getItem("gpxData");
+
+if (savedGPX) {
+  loadGPX(savedGPX);
+
+  // ファイル選択UIを隠す
+  document.getElementById("fileSelector").style.display = "none";
 }
 
 // ファイル選択イベント
@@ -81,6 +104,9 @@ document.getElementById("gpxFileInput").addEventListener("change", (e) => {
 
   reader.onload = (event) => {
     const gpxText = event.target.result;
+
+    // GPX保存
+    localStorage.setItem("gpxData", gpxText);
 
     loadGPX(gpxText);
     document.getElementById("fileSelector").style.display = "none";
@@ -401,8 +427,6 @@ function loadGPX(gpxText) {
       }
     }
   });
-  records = [];
-  localStorage.removeItem("records");
 
   const parser = new DOMParser();
   const xml = parser.parseFromString(gpxText, "text/xml");
@@ -486,45 +510,20 @@ function loadGPX(gpxText) {
 
       if (!startTime) return `${wp.name}`;
 
-      const now = new Date();
-
-      // 予定
       const distFromStart = getTraveledDistance(wp.routeIndex, latlngs);
-      const totalDistance = getTotalDistance(latlngs);
-      const plannedSpeed = totalDistance / (plannedDurationMs / 1000);
 
-      const plannedArrival = new Date(
-        startTime.getTime() + (distFromStart / plannedSpeed) * 1000
+      const pred = calcPrediction(
+        wp.routeIndex,
+        currentIndex,
+        latlngs,
+        startTime,
+        plannedDurationMs
       );
-
-      // 予測
-      const traveled = getTraveledDistance(currentIndex, latlngs);
-      const elapsedSec = (now - startTime) / 1000;
-
-      let predictedArrival = null;
-      let diffText = "-";
-      let color = "black";
-
-      if (elapsedSec > 0 && traveled > 0) {
-        const currentSpeed = traveled / elapsedSec;
-
-        const distToPoint =
-          getRemainingDistance(currentIndex, latlngs) -
-          getRemainingDistance(wp.routeIndex, latlngs);
-
-        predictedArrival = new Date(
-          now.getTime() + (distToPoint / currentSpeed) * 1000
-        );
-
-        const diffMs = predictedArrival - plannedArrival;
-        color = diffMs > 0 ? "red" : "blue";
-        diffText = formatDiff(diffMs);
-      }
 
       return `
         ${wp.name}（${(distFromStart / 1000).toFixed(1)} km）<br>
-        予測：${predictedArrival ? formatClock(predictedArrival) : "--"}<br>
-        差分：<span style="color:${color}">${diffText}</span>
+        予測：${pred.predicted}<br>
+        差分：<span style="color:${pred.color}">${pred.diffText}</span>
       `;
     });
 
@@ -588,6 +587,8 @@ function loadGPX(gpxText) {
     document.getElementById("updateBtn").classList.add("hidden");
     document.getElementById("endBtn").classList.add("hidden");
   }
+
+  initDecayParams();
 
 }
 
@@ -787,32 +788,22 @@ function updateCurrentPosition(latlngs) {
       // =========================
       // 📊 ゴール（予定・予測・差分）
       // =========================
-      const traveled = getTraveledDistance(result.index, latlngs);
-      const elapsedSec = elapsedMs / 1000;
 
-      if (elapsedSec > 0 && traveled > 0) {
+      const goalIndex = latlngs.length - 1;
 
-        // 🟩 予測（現在ペース）
-        const currentSpeed = traveled / elapsedSec;
-        const remaining = getRemainingDistance(result.index, latlngs);
+      const pred = calcPrediction(
+        goalIndex,
+        result.index,
+        latlngs,
+        startTime,
+        plannedDurationMs
+      );
 
-        const secToGoal = remaining / currentSpeed;
-        const predictedArrival = new Date(now.getTime() + secToGoal * 1000);
-
-        // 🟦 予定（固定）
-        const plannedArrival = goalTime;
-
-        // 🟥 差分
-        const diffMs = predictedArrival - plannedArrival;
-        const color = diffMs > 0 ? "red" : "blue";
-
-        document.getElementById("result").innerHTML =
-          `ゴール<br>
-          予測：${formatClock(predictedArrival)}
-          （<span style="color:${color}">${formatDiff(diffMs)}</span>）`;
-      }
+      document.getElementById("result").innerHTML =
+        `ゴール<br>
+        予測：${pred.predicted}
+        （<span style="color:${pred.color}">${pred.diffText}</span>）`;
     }
-
   });
 }
 
@@ -1340,8 +1331,41 @@ function findNextDistancePoint(currentIndex, waypoints) {
   return next;
 }
 
+// 起動時に係数計算
+function initDecayParams() {
+  const x1 = 100;
+  const x2 = 200;
+
+  const r1 = decay100;
+  const r2 = decay200;
+
+  decayA = (r2 / x2 - r1 / x1) / (x2 - x1);
+  decayB = r1 / x1 - decayA * x1;
+
+  console.log("減衰係数:", decayA, decayB);
+}
+
+// 減衰を考慮した時間計算関数
+function calcTimeWithDecay(fromKm, toKm, baseSpeedKmh) {
+  let time = 0;
+  const step = 0.5; // 0.5km単位
+
+  for (let x = fromKm; x < toKm; x += step) {
+
+    const r = decayA * x * x + decayB * x;
+    const v = baseSpeedKmh * (1 - r);
+
+    if (v <= 0) break;
+
+    time += step / v; // 時間（h）
+  }
+
+  return time * 3600; // 秒で返す
+}
+
 // 予測計算関数
 function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plannedDurationMs) {
+
   if (!startTime) {
     return {
       predicted: "--",
@@ -1362,32 +1386,44 @@ function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plan
     };
   }
 
-  // 現在速度
-  const speed = traveled / elapsedSec;
+  // =========================
+  // ① 実際の予測（今のペース）
+  // =========================
+  const currentSpeedMs = traveled / elapsedSec;
 
-  // 残距離
   const distToTarget =
     getRemainingDistance(currentIndex, latlngs) -
     getRemainingDistance(targetRouteIndex, latlngs);
 
-  // 予測到着
-  const sec = distToTarget / speed;
-  const arrival = new Date(now.getTime() + sec * 1000);
-
-  // 予定到着
-  const plannedDist = getTraveledDistance(targetRouteIndex, latlngs);
-  const totalDist = getTotalDistance(latlngs);
-  const plannedSpeed = totalDist / (plannedDurationMs / 1000);
-
-  const plannedArrival = new Date(
-    startTime.getTime() + (plannedDist / plannedSpeed) * 1000
+  const predictedArrival = new Date(
+    now.getTime() + (distToTarget / currentSpeedMs) * 1000
   );
 
-  // 差分
-  const diffMs = arrival - plannedArrival;
+  // =========================
+  // ② 予定（疲労カーブ）
+  // =========================
+  const plannedDist = getTraveledDistance(targetRouteIndex, latlngs);
+
+  const plannedBaseSpeed =
+    (getTotalDistance(latlngs) / 1000) / (plannedDurationMs / 3600000);
+
+  const plannedSec = calcTimeWithDecay(
+    0,
+    plannedDist / 1000,
+    plannedBaseSpeed
+  );
+
+  const plannedArrival = new Date(
+    startTime.getTime() + plannedSec * 1000
+  );
+
+  // =========================
+  // ③ 差分
+  // =========================
+  const diffMs = predictedArrival - plannedArrival;
 
   return {
-    predicted: formatClock(arrival),
+    predicted: formatClock(predictedArrival),
     diffText: formatDiff(diffMs),
     color: diffMs > 0 ? "red" : "blue"
   };
@@ -1494,6 +1530,7 @@ function resetAllState() {
   localStorage.removeItem("records");
   localStorage.removeItem("startTime");
   localStorage.removeItem("goalTime");
+  localStorage.removeItem("gpxData");
 
   // UI（ボタン状態）
   document.getElementById("startBtn").classList.remove("hidden");
@@ -1514,5 +1551,6 @@ function resetAllState() {
 //デバッグ用リセットボタン
 function resetApp() {
   localStorage.removeItem("startTime");
+  localStorage.removeItem("gpxData");
   location.reload();
 }
