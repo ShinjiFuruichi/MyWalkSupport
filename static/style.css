@@ -412,8 +412,8 @@ button:active {
   left: 50%;
   transform: translateX(-50%);
 
-  width: 94%;
-  max-width: 400px;
+  width: 85%;
+  max-width: 350px;
   max-height: 50%;
 
   overflow-y: auto;
@@ -422,7 +422,7 @@ button:active {
   border-radius: 10px;
   padding: 12px;
 
-  z-index: 1500;
+  z-index: 1000;
   font-size: 14px;
 }
 
