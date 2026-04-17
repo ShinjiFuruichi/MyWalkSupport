@@ -51,7 +51,9 @@ let restStartTime = null; // 休憩開始時間
 
 let mockIndex = 0; // モック位置のインデックス
 
-const totalDurationHours = TargetHour; // 例
+let isFinished = false; // 終了フラグ
+
+const totalDurationHours = TargetHour; 
 const totalDurationMs = totalDurationHours * 3600 * 1000;
 
 
@@ -180,6 +182,7 @@ document.getElementById("startBtn").onclick = () => {
 // 終了ボタン
 document.getElementById("endBtn").onclick = () => {
   endTime = new Date();
+  isFinished = true;
 
   if (timer) {
     clearInterval(timer);
@@ -194,11 +197,6 @@ document.getElementById("endBtn").onclick = () => {
 
   document.getElementById("result").textContent =
     `総時間: ${formatTime(totalTimeMs)} / 総距離: ${(traveled/1000).toFixed(2)} km`;
-  
-  if (records.length > 0) {
-    downloadJSON(true);
-  }
-
 
   console.log("終了:", endTime);
 };
@@ -213,17 +211,33 @@ document.getElementById("updateBtn").onclick = () => {
   refreshPositionAndUI();
 };
 
-//
+// 保存ボタン
 document.getElementById("saveBtn").onclick = () => {
-  downloadJSON(false);
+
+  // 途中 or 最終で分岐
+  if (isFinished) {
+    downloadJSON(true);  // ←最終版（タイムスタンプ付き）
+  } else {
+    downloadJSON(false); // ←途中保存（履歴）
+  }
 
   const statusEl = document.getElementById("status");
-  statusEl.textContent = "💾 保存しました";
+  statusEl.textContent = isFinished 
+    ? "📦 最終保存しました" 
+    : "💾 途中保存しました";
   statusEl.style.opacity = 1;
 
   setTimeout(() => {
     statusEl.style.opacity = 0;
   }, 2000);
+
+  // 終了してたらリセット
+  if (isFinished) {
+    if (confirm("保存してリセットしますか？")) {
+      resetAllState();
+      document.getElementById("fileSelector").style.display = "block";
+    }
+  }
 };
 
 // 標高グラフ表示トグル
@@ -1525,6 +1539,9 @@ function resetAllState() {
   startTime = null;
   goalTime = null;
   endTime = null;
+
+  // 終了フラグリセット
+  isFinished = false;
 
   // ローカルストレージ
   localStorage.removeItem("records");
