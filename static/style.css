@@ -385,6 +385,10 @@ button:active {
   padding: 20px;
   border-radius: 12px;
   text-align: center;
+  max-height: 80vh;   /* ←これ重要 */
+  overflow-y: auto;   /* ←スクロール可能にする */
+  width: 90%;
+  max-width: 400px;
 }
 
 .setupBox input {
