@@ -382,19 +382,27 @@ button:active {
 
 .setupBox {
   background: white;
-  padding: 20px;
+  padding: 12px;
   border-radius: 12px;
   text-align: center;
-  max-height: 80vh;   /* ←これ重要 */
+  max-height: 70vh;   /* ←これ重要 */
   overflow-y: auto;   /* ←スクロール可能にする */
-  width: 90%;
-  max-width: 400px;
+  width: 80%;
+  max-width: 350px;
+
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  z-index: 3000;
+  font-size: 14px;
 }
 
 .setupBox input {
   width: 80px;
   margin: 10px;
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .setupBox button {
@@ -402,7 +410,7 @@ button:active {
   padding: 10px 0;          /* 縦の余白 */
   margin-top: 10px;
 
-  font-size: 16px;
+  font-size: 14px;
   border: none;
   border-radius: 8px;
 
@@ -419,6 +427,12 @@ button:active {
   transform: scale(0.98);
 }
 
+#startPlannedInput {
+  width: 60%;
+  font-size: 14px;
+  padding: 6px;
+  box-sizing: border-box;
+}
 .record-panel {
   position: absolute;
   bottom: 80px;
