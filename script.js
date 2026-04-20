@@ -3,19 +3,34 @@
 //
 
 // 現在地取得関数（モックと実際の切り替え）
-let useMockLocation = false; // スマホ実地モード
-//let useMockLocation = true; // PCモックモード
-let TargetHour = 22; // 目標時間（例: 22時間）
-let targetMin = 0;   // 目標分（例: 0分）
-let ContourInterval = 100
+//let useMockLocation = false; // スマホ実地モード
+let useMockLocation = true; // PCモックモード
 
-// ===== 減衰設定 =====
-const decay100 = 0.10; // 100kmで10%ダウン
-const decay200 = 0.30; // 200kmで30%ダウン
+let settings = {
+  targetHour: 22,
+  targetMin: 0,
+  startPlannedTime: null,
+  restMinutes: 20,
+  cpRest: {},
+  contourInterval: 100,
+  decayPoints: [
+    { km: 100, rate: 0.10 },
+    { km: 200, rate: 0.30 }
+  ]
+};
 
+let plannedBaseTime = null;  // 予定基準時間（スタート予定時刻 or 実際のスタート時間）
+let plannedBaseSpeed = null;
+let startTime = null; // スタート時間
+let goalTime = null;  // ゴール予定時間
 let decayA = 0;
 let decayB = 0;
 
+loadSettings();
+if (!plannedBaseTime && settings.startPlannedTime) {
+  plannedBaseTime = new Date(settings.startPlannedTime);
+}
+initDecayParams(); 
 
 const statusBox = document.getElementById("status");
 
@@ -23,6 +38,8 @@ const TAGS = {
   "場所": ["CP", "エイド", "ストア", "私設", "その他"],
   "内容": ["休憩", "トイレ", "補給", "治療", "寝る", "支援"]
 };
+
+const REST_TYPES = ["CHECKPOINT", "REST AREA"];
 
 // 地図初期化
 const map = L.map('map').setView([35.0, 135.0], 13);
@@ -38,9 +55,7 @@ let waypoints = []; // ウェイポイントの配列をグローバル化
 let records = [];      // 保存済み記録
 let currentRecord = null; // 現在記録中のもの
 
-let plannedDurationMs = TargetHour * 60 * 60 * 1000; // 予定時間（例: 22時間）
-let startTime = null; // スタート時間
-let goalTime = null;  // ゴール予定時間
+let plannedDurationMs = (settings.targetHour + settings.targetMin / 60) * 3600 * 1000;
 let endTime = null;   // 終了時間
 let currentIndex = 0; // 現在のインデックス
 let timer = null;     // 位置自動更新用タイマー
@@ -53,9 +68,7 @@ let mockIndex = 0; // モック位置のインデックス
 
 let isFinished = false; // 終了フラグ
 
-const totalDurationHours = TargetHour; 
-const totalDurationMs = totalDurationHours * 3600 * 1000;
-
+let selectedIndex = null;
 
 //
 // ===== データ読み込み、解析、復元 =====
@@ -67,27 +80,12 @@ if (useMockLocation) {
   localStorage.removeItem("goalTime");
 }
 
-const savedHour = localStorage.getItem("targetHour");
-const savedMin = localStorage.getItem("targetMin");
-
-if (savedHour) {
-  document.getElementById("targetHourInput").value = savedHour;
-}
-if (savedMin) {
-  document.getElementById("targetMinInput").value = savedMin;
-}
-
-// plannedDurationMsも復元
-if (savedHour && savedMin) {
-  const totalHour = Number(savedHour) + Number(savedMin) / 60;
-  plannedDurationMs = totalHour * 60 * 60 * 1000;
-}
-
 // ★追加：起動時にGPX復元
 const savedGPX = localStorage.getItem("gpxData");
 
 if (savedGPX) {
   loadGPX(savedGPX);
+  applySettingsToUI();
 
   // ファイル選択UIを隠す
   document.getElementById("fileSelector").style.display = "none";
@@ -111,6 +109,8 @@ document.getElementById("gpxFileInput").addEventListener("change", (e) => {
     localStorage.setItem("gpxData", gpxText);
 
     loadGPX(gpxText);
+    applySettingsToUI();
+    renderCpRestInputs();
     document.getElementById("fileSelector").style.display = "none";
     document.getElementById("setupPanel").style.display = "flex";
   };
@@ -118,31 +118,193 @@ document.getElementById("gpxFileInput").addEventListener("change", (e) => {
   reader.readAsText(file);
 });
 
-//
+// 設定保存イベント
 document.getElementById("startSetupBtn").onclick = () => {
-  const hour = Number(document.getElementById("targetHourInput").value)|| 0;
-  const min = Number(document.getElementById("targetMinInput").value)|| 0;
 
+  // =========================
+  // 入力取得
+  // =========================
+  const hour = Number(document.getElementById("targetHourInput").value) || 0;
+  const min  = Number(document.getElementById("targetMinInput").value) || 0;
+
+  const paceMin = Number(document.getElementById("paceMinInput")?.value) || 0;
+  const paceSec = Number(document.getElementById("paceSecInput")?.value) || 0;
+
+  const restMin = Number(document.getElementById("restInput").value) || 20;
+  const contour = Number(document.getElementById("contourInput").value) || 100;
+
+  const decayKm1   = Number(document.getElementById("decayKm1").value) || 100;
+  const decayRate1 = Number(document.getElementById("decayRate1").value) || 10;
+
+  const decayKm2   = Number(document.getElementById("decayKm2").value) || 200;
+  const decayRate2 = Number(document.getElementById("decayRate2").value) || 30;
+
+  // =========================
+  // バリデーション
+  // =========================
   if (hour < 0 || min < 0) {
     alert("正しい時間を入力してね");
     return;
   }
 
-  const totalHour = hour + (min / 60);
+  // =========================
+  // 共通設定反映
+  // =========================
+  settings.restMinutes = restMin;
+  settings.contourInterval = contour;
 
-  plannedDurationMs = totalHour * 60 * 60 * 1000;
+  settings.decayPoints = [
+    { km: decayKm1, rate: decayRate1 / 100 },
+    { km: decayKm2, rate: decayRate2 / 100 }
+  ];
 
-  // 表示
-  document.getElementById("targetDisplay").textContent =
-    `設定：${hour}時間 ${min}分`;
-  document.getElementById("targetDisplay").classList.remove("hidden");
+  // =========================
+  // スタート予定時刻
+  // =========================
+  const startPlannedInput = document.getElementById("startPlannedInput");
+  if (startPlannedInput && startPlannedInput.value) {
+    settings.startPlannedTime = startPlannedInput.value;
+    plannedBaseTime = new Date(settings.startPlannedTime);
+  }
 
+  // =========================
+  // ★ここが今回の本体（分岐）
+  // =========================
+
+  const totalKm = getTotalDistance(latlngs) / 1000;
+  const restHour = calcTotalRestTime() / 60;
+
+  let totalHour = 0;
+
+  // ===== ペース入力優先 =====
+  const paceMinStr = document.getElementById("paceMinInput").value;
+  const paceSecStr = document.getElementById("paceSecInput").value;
+
+  const isPaceInput = paceMinStr !== "" || paceSecStr !== "";
+
+  if (isPaceInput) {
+
+    const pace = paceMin + paceSec / 60;
+
+    plannedBaseSpeed = 60 / pace;
+
+    const movingHour = (pace * totalKm) / 60;
+    totalHour = movingHour + restHour;
+
+    settings.targetHour = Math.floor(totalHour);
+    settings.targetMin = Math.round((totalHour % 1) * 60);
+
+  } else {
+
+    totalHour = hour + (min / 60);
+
+    settings.targetHour = hour;
+    settings.targetMin = min;
+  }
+
+plannedDurationMs = totalHour * 3600 * 1000;
+
+// ★ここがポイント
+initDecayParams();
+
+if (!isPaceInput) {
+  updatePlannedBaseSpeed();
+}
+
+  plannedDurationMs = totalHour * 3600 * 1000;
+
+  // =========================
+  // 減衰・速度再計算
+  // =========================
+  initDecayParams();
+  
+  if (!isPaceInput) {
+    updatePlannedBaseSpeed();
+  }
+
+  // =========================
+  // CP休憩保存
+  // =========================
+  document.querySelectorAll("#cpRestContainer input").forEach(input => {
+    const cpName = input.dataset.cpName;
+    settings.cpRest[cpName] = Number(input.value) ?? 0;
+  });
+
+  // =========================
   // 保存
-  localStorage.setItem("targetHour", hour);
-  localStorage.setItem("targetMin", min);
+  // =========================
+  saveSettings();
 
+  // =========================
+  // UI閉じる
+  // =========================
   document.getElementById("setupPanel").style.display = "none";
+
+  console.log("設定保存:", settings);
+  applySettingsToUI();
 };
+
+// 全CPに適用ボタン
+document.getElementById("applyAllBtn").onclick = () => {
+  const restMin = Number(document.getElementById("restInput").value) ?? 20;
+  Object.keys(settings.cpRest).forEach(cp => {
+    settings.cpRest[cp] = restMin;
+  });
+  renderCpRestInputs(); // UI更新
+  updatePlannedBaseSpeed();
+  console.log("全CPに適用:", restMin);
+};
+
+// ===== 目標時間の分 → 繰り上げ =====
+const targetMinInput = document.getElementById("targetMinInput");
+const targetHourInput = document.getElementById("targetHourInput");
+
+targetMinInput.addEventListener("input", () => {
+
+  let min = Number(targetMinInput.value) || 0;
+  let hour = Number(targetHourInput.value) || 0;
+
+  if (min >= 60) {
+    hour += Math.floor(min / 60);
+    min = min % 60;
+  }
+
+  // ★追加（マイナス方向）
+  if (min < 0) {
+    const borrow = Math.ceil(Math.abs(min) / 60);
+    hour -= borrow;
+    min = (min % 60 + 60) % 60;
+  }
+
+  targetHourInput.value = hour;
+  targetMinInput.value = min;
+});
+
+// ===== ペース秒 → 分繰り上げ =====
+const paceSecInput = document.getElementById("paceSecInput");
+const paceMinInput = document.getElementById("paceMinInput");
+
+paceSecInput.addEventListener("input", () => {
+
+  let sec = Number(paceSecInput.value) || 0;
+  let min = Number(paceMinInput.value) || 0;
+
+  if (sec >= 60) {
+    min += Math.floor(sec / 60);
+    sec = sec % 60;
+  }
+
+  // ★追加（マイナス方向）
+  if (sec < 0) {
+    const borrow = Math.ceil(Math.abs(sec) / 60);
+    min -= borrow;
+    sec = (sec % 60 + 60) % 60;
+  }
+
+  paceMinInput.value = min;
+  paceSecInput.value = sec;
+});
+
 
 // ===== 保存データ読み込み =====
 loadRecords();
@@ -155,11 +317,13 @@ document.getElementById("setupPanel").style.display = "none";
 // スタートボタン
 document.getElementById("startBtn").onclick = () => {
   startTime = new Date();
+  plannedBaseTime = startTime;
   goalTime = new Date(startTime.getTime() + plannedDurationMs);
 
   // ローカルストレージにスタート時間を保存
   localStorage.setItem("startTime", startTime.toISOString());
-  localStorage.setItem("goalTime", goalTime.toISOString())
+  localStorage.setItem("goalTime", goalTime.toISOString());
+  localStorage.setItem("plannedBaseTime", plannedBaseTime.toISOString());
   
   document.getElementById("startBtn").classList.add("hidden");
   document.getElementById("saveBtn").classList.remove("hidden");
@@ -168,6 +332,7 @@ document.getElementById("startBtn").onclick = () => {
   document.getElementById("tagBtn").classList.remove("hidden");
   document.getElementById("quickBtn").classList.remove("hidden");
   document.getElementById("listBtn").classList.remove("hidden");
+  document.getElementById("configBtn").classList.remove("hidden");
 
   updateCurrentPosition(latlngs);
 
@@ -364,33 +529,38 @@ document.getElementById("infoPanel").onclick = () => {
 // クイック記録ボタン
 document.getElementById("quickBtn").onclick = () => {
 
-  refreshPositionAndUI();
+  getCurrentLocation(current => {
 
-  if (!lastPosition) {
-    alert("位置取得中");
-    return;
-  }
+    const now = new Date();
 
-  const record = buildRecord([]);
-  if (!record) return;
-  record.id = Date.now();
-  records.push(record);
+    const result = findNearestIndex(current, latlngs);
+    currentIndex = result.index;
 
-  localStorage.setItem("records", JSON.stringify(records));
+    // UIも更新（必要なら）
+    updateCurrentPosition(latlngs);
 
-  const statusEl = document.getElementById("status");
-  statusEl.textContent = "✔ 記録";
-  statusEl.style.opacity = 1;
+    // 記録
+    const record = buildRecord([]);
+    if (!record) return;
 
-  setTimeout(() => {
-    statusEl.style.opacity = 0;
-  }, 1500);
+    record.id = Date.now();
+    records.push(record);
 
-  const recordPanel = document.getElementById("recordPanel");
-  if (!recordPanel.classList.contains("hidden")) {
-    renderRecordList();
-  }
+    localStorage.setItem("records", JSON.stringify(records));
 
+    const statusEl = document.getElementById("status");
+    statusEl.textContent = "✔ 記録";
+    statusEl.style.opacity = 1;
+
+    setTimeout(() => {
+      statusEl.style.opacity = 0;
+    }, 1500);
+
+    if (!document.getElementById("recordPanel").classList.contains("hidden")) {
+      renderRecordList();
+    }
+
+  });
 };
 
 // 記録リスト表示ボタン
@@ -399,6 +569,25 @@ document.getElementById("listBtn").onclick = () => {
 
   if (panel.classList.contains("hidden")) {
     renderRecordList();
+    panel.classList.remove("hidden");
+  } else {
+    panel.classList.add("hidden");
+  }
+};
+
+// 設定ボタン
+document.getElementById("configBtn").onclick = () => {
+  applySettingsToUI();
+  renderCpRestInputs();
+  document.getElementById("setupPanel").style.display = "flex";
+};
+
+document.getElementById("cpListBtn").onclick = () => {
+
+  const panel = document.getElementById("cpListPanel");
+
+  if (panel.classList.contains("hidden")) {
+    renderCheckpointList();
     panel.classList.remove("hidden");
   } else {
     panel.classList.add("hidden");
@@ -489,6 +678,16 @@ function loadGPX(gpxText) {
   const distancePoints = generateDistancePoints(latlngs, 10);
   waypoints = waypoints.concat(distancePoints);
 
+  // チェックポイント休憩時間の初期化
+  if (!settings.cpRest) settings.cpRest = {};
+  waypoints.forEach(wp => {
+    if (REST_TYPES.includes(wp.type)) {
+      if (settings.cpRest[wp.name] == null) {
+        settings.cpRest[wp.name] = settings.restMinutes;
+      }
+    }
+  });
+
   const trkNameTag = xml.getElementsByTagName("trk")[0]
                     ?.getElementsByTagName("name")[0];
 
@@ -522,9 +721,15 @@ function loadGPX(gpxText) {
     // ポップアップ内容を動的にするため関数化
     .bindPopup(() => {
 
-      if (!startTime) return `${wp.name}`;
-
       const distFromStart = getTraveledDistance(wp.routeIndex, latlngs);
+      const planned = calcPlannedArrival(wp.routeIndex);
+
+      if (!startTime) {
+        return `
+          ${wp.name}（${(distFromStart / 1000).toFixed(1)} km）<br>
+          予定：${planned}
+        `;
+      }
 
       const pred = calcPrediction(
         wp.routeIndex,
@@ -536,9 +741,11 @@ function loadGPX(gpxText) {
 
       return `
         ${wp.name}（${(distFromStart / 1000).toFixed(1)} km）<br>
+        予定：${planned}<br>
         予測：${pred.predicted}<br>
         差分：<span style="color:${pred.color}">${pred.diffText}</span>
       `;
+
     });
 
   });
@@ -546,6 +753,7 @@ function loadGPX(gpxText) {
   // 最初の位置とUI更新
   updateCurrentPosition(latlngs);
   document.getElementById("startBtn").classList.remove("hidden");
+  document.getElementById("updateBtn").classList.remove("hidden");
   document.getElementById("elevationBtn").classList.remove("hidden");
 
   // 標高グラフクリックで斜度表示
@@ -562,6 +770,11 @@ function loadGPX(gpxText) {
 
     const safeIndex = Math.max(1, Math.min(latlngs.length - 2, index));
 
+    selectedIndex = safeIndex;
+
+    const elevations = getElevations(latlngs);
+    drawElevation(elevations, currentIndex);
+
     const slope = getSlopePercent(safeIndex, latlngs);
     const ele = latlngs[safeIndex].ele;
     showSlopePopup(e.clientX, e.clientY, slope, ele);
@@ -573,15 +786,20 @@ function loadGPX(gpxText) {
 
   // ページ読み込み時にスタート時間が保存されていれば復元
   const savedStart = localStorage.getItem("startTime");
+  const savedPlanned = localStorage.getItem("plannedBaseTime");
 
   if (savedStart) {
     startTime = new Date(savedStart);
+
+    if (savedPlanned) {
+      plannedBaseTime = new Date(savedPlanned);
+    }
 
     // スタートは隠す
     document.getElementById("startBtn").classList.add("hidden");
 
     // 更新・終了は表示
-    document.getElementById("updateBtn").classList.remove("hidden");
+    //document.getElementById("updateBtn").classList.remove("hidden");
     document.getElementById("endBtn").classList.remove("hidden");
     document.getElementById("tagBtn").classList.remove("hidden");
     document.getElementById("quickBtn").classList.remove("hidden");
@@ -598,11 +816,12 @@ function loadGPX(gpxText) {
 
   } else {
     // 初期状態
-    document.getElementById("updateBtn").classList.add("hidden");
+    //document.getElementById("updateBtn").classList.add("hidden");
     document.getElementById("endBtn").classList.add("hidden");
   }
 
   initDecayParams();
+  //updatePlannedBaseSpeed();
 
 }
 
@@ -636,29 +855,14 @@ function getCurrentLocation(callback) {
 
 // 位置とUIを更新する関数
 function updateCurrentPosition(latlngs) {
+
   getCurrentLocation(current => {
+
+    // =========================
+    // ① 基本データ
+    // =========================
     const now = new Date();
 
-    let speedKmh = 0;
-
-    if (lastPosition && lastTime) {
-      const dist = getDistanceMeters(lastPosition, current); // m
-      const dt = (now - lastTime) / 1000; // 秒
-
-      if (dt > 0) {
-        const speedMs = dist / dt;
-        speedKmh = speedMs * 3.6;
-      }
-    }
-
-    // 更新
-    lastPosition = current;
-    lastTime = now;
-
-    console.log("速度(km/h):", speedKmh.toFixed(2));
-
-    console.log("現在地:", current);
-    // 最寄り点を先に取得
     const result = findNearestIndex(current, latlngs);
     currentIndex = result.index;
 
@@ -667,11 +871,11 @@ function updateCurrentPosition(latlngs) {
       latlngs[result.index].lon
     ];
 
-    // 標高グラフ更新
-    const elevations = getElevations(latlngs);
-    drawElevation(elevations, currentIndex);
+    // =========================
+    // ② 地図更新
+    // =========================
 
-    // 緑（現在地）
+    // 現在地（緑）
     if (window.currentMarker) {
       window.currentMarker.setLatLng(current);
     } else {
@@ -681,9 +885,7 @@ function updateCurrentPosition(latlngs) {
       }).addTo(map);
     }
 
-    map.setView(current, 15);
-
-    // 黄（最寄り点）
+    // 最寄り点（黄）
     if (window.nearestMarker) {
       window.nearestMarker.setLatLng(nearestPoint);
     } else {
@@ -693,7 +895,7 @@ function updateCurrentPosition(latlngs) {
       }).addTo(map);
     }
 
-    // 線（ズレ）
+    // ズレ線
     if (window.snapLine) {
       window.snapLine.setLatLngs([current, nearestPoint]);
     } else {
@@ -703,121 +905,114 @@ function updateCurrentPosition(latlngs) {
       }).addTo(map);
     }
 
-    console.log("ズレ(m):", result.distance);
-    console.log("最寄りindex:", result.index);
-  
-        // 残距離
-    const remaining = getRemainingDistance(result.index, latlngs);
-    console.log("残距離(m):", remaining);
+    map.setView(current, 15);
 
+    // =========================
+    // ③ 距離・進捗
+    // =========================
     const total = getTotalDistance(latlngs);
-    const traveled = getTraveledDistance(result.index, latlngs);
+    const traveled = getTraveledDistance(currentIndex, latlngs);
+    const remaining = getRemainingDistance(currentIndex, latlngs);
+
     const percent = (traveled / total) * 100;
 
-    // 表示更新
     document.getElementById("progress").textContent =
       `進捗：${(traveled / 1000).toFixed(2)} km（${percent.toFixed(1)}%）`;
+
     document.getElementById("remaining").textContent =
       `残り：${(remaining / 1000).toFixed(2)} km`;
 
-    console.log("進捗(%):", percent.toFixed(1));
-    console.log("残距離(km):", (remaining / 1000).toFixed(2));
-    console.log("進んだ距離(km):", (traveled / 1000).toFixed(2));
+    // =========================
+    // ④ ペース計算
+    // =========================
+    const pace = calcRequiredPace();
+    const restTotal = calcTotalRestTime();
 
-    // 次のチェックポイントと途中の目的地を取得
-    const { nextStop, nextCP } = getNextTargets(
-      result.index,
-      latlngs,
-      waypoints
-    );
-    //
-    const nextDistancePoint = findNextDistancePoint(result.index, waypoints);
-
-    // 表示用テキスト
-    let text = "";
-
-    // 🔵 途中の目的地あり
-    if (nextStop) {
-      const distStop =
-        getRemainingDistance(result.index, latlngs) -
-        getRemainingDistance(nextStop.routeIndex, latlngs);
-      const distFromStart = getTraveledDistance(nextStop.routeIndex, latlngs);
-
-      text += `<span class="next-stop">次：${nextStop.name}
-      （${(distFromStart / 1000).toFixed(1)} km）</span><br>`;
-      text += `距離：${(distStop / 1000).toFixed(2)} km<br>`;
-
-      // 予測
-      const pred = calcPrediction(nextStop.routeIndex, result.index, latlngs, startTime, plannedDurationMs);
-      text += `予測：${pred.predicted}（<span style="color:${pred.color}">${pred.diffText}</span>）<br>`;
+    let paceText = "--";
+    if (pace) {
+      paceText = `${pace.speed}km/h（${pace.pace}）`;
     }
 
-    // 🔴 次のCP
-    if (nextCP) {
-      const distCP =
-        getRemainingDistance(result.index, latlngs) -
-        getRemainingDistance(nextCP.routeIndex, latlngs);
-      const distFromStart = getTraveledDistance(nextCP.routeIndex, latlngs);
+    const targetText = `${settings.targetHour}時間${settings.targetMin}分`;
 
-      text += `<span class="next-cp">次CP：${nextCP.name}
-      （${(distFromStart / 1000).toFixed(1)} km）</span><br>`;
-      text += `距離：${(distCP / 1000).toFixed(2)} km<br>`;
-
-      // 予測
-      const pred = calcPrediction(nextCP.routeIndex, result.index, latlngs, startTime, plannedDurationMs);
-      text += `予測：${pred.predicted}（<span style="color:${pred.color}">${pred.diffText}</span>）<br>`;
-    }
-
-    if (nextDistancePoint) {
-      const dist =
-        getRemainingDistance(result.index, latlngs) -
-        getRemainingDistance(nextDistancePoint.routeIndex, latlngs);
-
-      text += `<span class="next-kp">キロP：${nextDistancePoint.name}</span><br>`;
-      text += `距離：${(dist / 1000).toFixed(2)} km<br>`;
-
-      // 予測
-      const pred = calcPrediction(nextDistancePoint.routeIndex, result.index, latlngs, startTime, plannedDurationMs);
-      text += `予測：${pred.predicted}（<span style="color:${pred.color}">${pred.diffText}</span>）<br>`;
-    }
-
-    // 表示
-    document.getElementById("next").innerHTML = text;
-
+    // =========================
+    // ⑤ 時間表示
+    // =========================
     if (startTime) {
-      const now = new Date();
 
-      // =========================
-      // ⏱ 時間表示
-      // =========================
       const elapsedMs = now - startTime;
 
-      const nowText = formatClock(now);
-      const startText = formatClock(startTime);
+      document.getElementById("timeInfo").innerHTML =
+        `目標：${targetText}<br>
+         休憩合計：${restTotal}分<br>
+         初速：${paceText}<br>
+         現在：${formatClock(now)}（開始：${formatClock(startTime)}）<br>
+         経過：${formatDuration(elapsedMs)}`;
+
+    } else {
+
+      const plannedStart = settings.startPlannedTime
+        ? formatClock(new Date(settings.startPlannedTime))
+        : "--";
 
       document.getElementById("timeInfo").innerHTML =
-        `現在：${nowText}（開始：${startText}）<br>
-        経過：${formatDuration(elapsedMs)}`;
+        `目標：${targetText}<br>
+         休憩合計：${restTotal}分<br>
+         初速：${paceText}<br>
+         開始予定：${plannedStart}`;
+    }
 
-      // =========================
-      // 📊 ゴール（予定・予測・差分）
-      // =========================
+    // =========================
+    // ⑥ ゴール表示
+    // =========================
+    const goalIndex = latlngs.length - 1;
+    const planned = calcPlannedArrival(goalIndex);
 
-      const goalIndex = latlngs.length - 1;
+    let predText = "";
 
+    if (startTime) {
       const pred = calcPrediction(
         goalIndex,
-        result.index,
+        currentIndex,
         latlngs,
         startTime,
         plannedDurationMs
       );
 
-      document.getElementById("result").innerHTML =
-        `ゴール<br>
-        予測：${pred.predicted}
+      predText = `<br>予測：${pred.predicted}
         （<span style="color:${pred.color}">${pred.diffText}</span>）`;
     }
+
+    document.getElementById("result").innerHTML =
+      `ゴール<br>
+       予定：${planned}
+       ${predText}`;
+
+    // =========================
+    // ⑦ 次の目的地
+    // =========================
+    const { nextStop, nextCP } = getNextTargets(
+      currentIndex,
+      latlngs,
+      waypoints
+    );
+
+    let text = "";
+
+    if (nextStop) {
+      const dist = getTraveledDistance(nextStop.routeIndex, latlngs);
+
+      text += `次：${nextStop.name}（${(dist/1000).toFixed(1)}km）<br>`;
+    }
+
+    if (nextCP) {
+      const dist = getTraveledDistance(nextCP.routeIndex, latlngs);
+
+      text += `次CP：${nextCP.name}（${(dist/1000).toFixed(1)}km）`;
+    }
+
+    document.getElementById("next").innerHTML = text;
+
   });
 }
 
@@ -959,7 +1154,7 @@ function drawElevation(elevations, currentIndex) {
   // ===== 横グリッド（100mごと） =====
   ctx.beginPath();
 
-  const step = ContourInterval; // 100mごと
+  const step = settings.contourInterval;
 
   // 最小・最大を100m単位に丸める
   const start = Math.floor(min / step) * step;
@@ -1015,6 +1210,19 @@ function drawElevation(elevations, currentIndex) {
   ctx.strokeStyle = "rgba(255,0,0,0.8)";
   ctx.lineWidth = 2;
   ctx.stroke();
+
+  // ===== タップ位置ライン（青） =====
+  if (selectedIndex !== null) {
+    const xSel = (selectedIndex / elevations.length) * w;
+
+    ctx.beginPath();
+    ctx.moveTo(xSel, 0);
+    ctx.lineTo(xSel, h);
+
+    ctx.strokeStyle = "blue";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 }
 
 // 斜度計算関数
@@ -1347,11 +1555,10 @@ function findNextDistancePoint(currentIndex, waypoints) {
 
 // 起動時に係数計算
 function initDecayParams() {
-  const x1 = 100;
-  const x2 = 200;
-
-  const r1 = decay100;
-  const r2 = decay200;
+  const x1 = settings.decayPoints[0].km;
+  const r1 = settings.decayPoints[0].rate;
+  const x2 = settings.decayPoints[1].km;
+  const r2 = settings.decayPoints[1].rate;
 
   decayA = (r2 / x2 - r1 / x1) / (x2 - x1);
   decayB = r1 / x1 - decayA * x1;
@@ -1375,6 +1582,62 @@ function calcTimeWithDecay(fromKm, toKm, baseSpeedKmh) {
   }
 
   return time * 3600; // 秒で返す
+}
+
+// 休憩時間をルート上のインデックスまで計算する関数
+function calcRestTimeToIndex(targetRouteIndex) {
+  let totalSec = 0;
+
+  waypoints.forEach(wp => {
+    if (!REST_TYPES.includes(wp.type)) return;
+
+    if (wp.routeIndex < targetRouteIndex) {
+      totalSec += (settings.cpRest?.[wp.name] ?? 0) * 60;
+    }
+  });
+
+  return totalSec;
+}
+
+// 休憩時間の総計を計算する関数
+function calcTotalRestTime() {
+  let totalMin = 0;
+
+  waypoints.forEach(wp => {
+    if (!REST_TYPES.includes(wp.type)) return;
+
+    totalMin += (settings.cpRest?.[wp.name] ?? 0);
+  });
+
+  return totalMin; // 分で返す
+}
+
+// 予定到着時間計算関数
+function calcPlannedArrival(targetRouteIndex) {
+
+  const baseTime =
+    plannedBaseTime ??
+    (settings.startPlannedTime
+      ? new Date(settings.startPlannedTime)
+      : null);
+
+  if (!baseTime) return "--";
+
+  const plannedDist = getTraveledDistance(targetRouteIndex, latlngs);
+
+  const moveSec = calcTimeWithDecay(
+    0,
+    plannedDist / 1000,
+    plannedBaseSpeed
+  );
+
+  const restSec = calcRestTimeToIndex(targetRouteIndex);
+
+  const plannedArrival = new Date(
+    baseTime.getTime() + (moveSec + restSec) * 1000
+  );
+
+  return formatClock(plannedArrival);
 }
 
 // 予測計算関数
@@ -1418,17 +1681,18 @@ function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plan
   // =========================
   const plannedDist = getTraveledDistance(targetRouteIndex, latlngs);
 
-  const plannedBaseSpeed =
-    (getTotalDistance(latlngs) / 1000) / (plannedDurationMs / 3600000);
-
   const plannedSec = calcTimeWithDecay(
     0,
     plannedDist / 1000,
     plannedBaseSpeed
   );
 
+  const restSec = calcRestTimeToIndex(targetRouteIndex);
+
+  const baseTime = plannedBaseTime || startTime;
+
   const plannedArrival = new Date(
-    startTime.getTime() + plannedSec * 1000
+    baseTime.getTime() + (plannedSec + restSec) * 1000
   );
 
   // =========================
@@ -1441,6 +1705,77 @@ function calcPrediction(targetRouteIndex, currentIndex, latlngs, startTime, plan
     diffText: formatDiff(diffMs),
     color: diffMs > 0 ? "red" : "blue"
   };
+}
+
+// 必要ペース計算関数
+function calcRequiredPace() {
+
+  if (!plannedBaseSpeed) return null;
+
+  const speed = plannedBaseSpeed;
+
+  const paceMin = 60 / speed;
+  const min = Math.floor(paceMin);
+  const sec = Math.round((paceMin - min) * 60);
+
+  return {
+    speed: speed.toFixed(2),
+    pace: `${min}分${sec}秒/km`
+  };
+}
+
+// ゴールまでの必要時間をペースから計算する関数
+function calcGoalTimeFromPace(paceMinPerKm) {
+
+  const totalKm = getTotalDistance(latlngs) / 1000;
+
+  const movingHour = (paceMinPerKm * totalKm) / 60;
+
+  const restHour = calcTotalRestTime() / 60;
+
+  const totalHour = movingHour + restHour;
+
+  return totalHour;
+}
+
+// 目標時間から必要なペースを逆算する関数
+function findBaseSpeed(totalKm, movingHour) {
+
+  let low = 1;     // km/h
+  let high = 15;   // km/h（適当な上限）
+
+  for (let i = 0; i < 30; i++) {
+
+    const mid = (low + high) / 2;
+
+    const t = calcTimeWithDecay(0, totalKm, mid) / 3600;
+
+    if (t > movingHour) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+  }
+
+  return (low + high) / 2;
+}
+
+// 初速更新関数（設定変更や休憩時間変化時に呼び出す）
+function updatePlannedBaseSpeed() {
+  const totalKm = getTotalDistance(latlngs) / 1000;
+  const totalHour = plannedDurationMs / 3600000;
+  const restHour = calcTotalRestTime() / 60;
+
+  const movingHour = totalHour - restHour;
+
+  plannedBaseSpeed = findBaseSpeed(totalKm, movingHour);
+
+  console.log("初速更新:", plannedBaseSpeed);
+}
+
+function paceToSpeed(min, sec) {
+  const paceMin = min + sec / 60;
+  return 60 / paceMin;
 }
 
 // データダウンロード
@@ -1491,7 +1826,7 @@ function renderRecordList() {
     return;
   }
 
-  records.forEach(r => {
+  [...records].reverse().forEach(r => {
 
     const div = document.createElement("div");
     div.className = "record-item";
@@ -1528,6 +1863,182 @@ function renderRecordList() {
   });
 }
 
+// 設定保存関数
+function saveSettings() {
+  localStorage.setItem("settings", JSON.stringify(settings));
+}
+
+// 設定読み込み関数
+function loadSettings() {
+  const saved = localStorage.getItem("settings");
+  if (!saved) return;
+
+  try {
+    const parsed = JSON.parse(saved);
+
+    // ===== 安全マージ =====
+    settings = {
+      ...settings,
+      ...parsed,
+
+      // ネストも個別に補正
+      cpRest: {
+        ...(settings.cpRest || {}),
+        ...(parsed.cpRest || {})
+      },
+
+      decayPoints: Array.isArray(parsed.decayPoints)
+        ? parsed.decayPoints.map(p => ({
+            km: Number(p.km) || 0,
+            rate: Number(p.rate) || 0
+          }))
+        : settings.decayPoints
+    };
+
+    // ===== 型補正 =====
+    settings.targetHour = Number(settings.targetHour) || 0;
+    settings.targetMin = Number(settings.targetMin) || 0;
+    settings.restMinutes = Number(settings.restMinutes) || 20;
+    settings.contourInterval = Number(settings.contourInterval) || 100;
+
+    // startPlannedTimeは文字列 or null
+    if (!settings.startPlannedTime) {
+      settings.startPlannedTime = null;
+    }
+
+    console.log("設定復元:", settings);
+
+  } catch (e) {
+    console.error("settings復元失敗:", e);
+  }
+}
+
+// 設定をUIに反映する関数
+function applySettingsToUI() {
+  const startInput = document.getElementById("startPlannedInput");
+  if (startInput && settings.startPlannedTime) {
+    startInput.value = settings.startPlannedTime.slice(0,16);
+  }
+
+  document.getElementById("targetHourInput").value = settings.targetHour;
+  document.getElementById("targetMinInput").value = settings.targetMin;
+
+  document.getElementById("restInput").value = settings.restMinutes;
+  document.getElementById("contourInput").value = settings.contourInterval;
+
+  document.getElementById("decayKm1").value = settings.decayPoints[0].km;
+  document.getElementById("decayRate1").value = settings.decayPoints[0].rate * 100;
+
+  document.getElementById("decayKm2").value = settings.decayPoints[1].km;
+  document.getElementById("decayRate2").value = settings.decayPoints[1].rate * 100;
+}
+
+// チェックポイントごとの休憩時間入力UIを生成する関数
+function renderCpRestInputs() {
+  const container = document.getElementById("cpRestContainer");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  waypoints.forEach(wp => {
+    if (!REST_TYPES.includes(wp.type)) return;
+
+    const row = document.createElement("div");
+    row.className = "cp-rest-row";
+
+    row.innerHTML = `
+      <span>${wp.name}</span>
+      <input type="number"
+             min="0"
+             value="${settings.cpRest?.[wp.name] ?? settings.restMinutes}"
+             data-cp-name="${wp.name}">
+      <span>分</span>
+    `;
+
+    container.appendChild(row);
+
+    const input = row.querySelector("input");
+
+    input.addEventListener("input", () => {
+      const cpName = input.dataset.cpName;
+
+      settings.cpRest[cpName] = Number(input.value) || 0;
+
+      updatePlannedBaseSpeed();
+    });
+
+  });
+}
+
+// チェックポイントリストを構築する関数
+function buildCheckpointList() {
+
+  const list = [];
+
+  waypoints.forEach(wp => {
+
+    if (!REST_TYPES.includes(wp.type)) return;
+
+    const planned = calcPlannedArrival(wp.routeIndex);
+
+    let predicted = "--";
+    let diff = "--";
+    let color = "black";
+
+    if (startTime) {
+      const pred = calcPrediction(
+        wp.routeIndex,
+        currentIndex,
+        latlngs,
+        startTime,
+        plannedDurationMs
+      );
+
+      predicted = pred.predicted;
+      diff = pred.diffText;
+      color = pred.color;
+    }
+
+    list.push({
+      name: wp.name,
+      distance: getTraveledDistance(wp.routeIndex, latlngs),
+      planned,
+      predicted,
+      diff,
+      color
+    });
+
+  });
+
+  return list;
+}
+
+// チェックポイントリストをUIに表示する関数
+function renderCheckpointList() {
+
+  const panel = document.getElementById("cpListPanel");
+  panel.innerHTML = "";
+
+  const list = buildCheckpointList();
+
+  console.log("list:", list.length);
+
+  list.forEach(item => {
+
+    const div = document.createElement("div");
+    div.className = "cp-item";
+
+    div.innerHTML = `
+      <b>${item.name}</b>（${(item.distance/1000).toFixed(1)}km）<br>
+      予定：${item.planned}<br>
+      予測：${item.predicted}<br>
+      差分：<span style="color:${item.color}">${item.diff}</span>
+    `;
+
+    panel.appendChild(div);
+  });
+}
+
 // 記録クリア関数
 function resetAllState() {
 
@@ -1548,6 +2059,7 @@ function resetAllState() {
   localStorage.removeItem("startTime");
   localStorage.removeItem("goalTime");
   localStorage.removeItem("gpxData");
+  localStorage.removeItem("plannedBaseTime");
 
   // UI（ボタン状態）
   document.getElementById("startBtn").classList.remove("hidden");
@@ -1557,7 +2069,6 @@ function resetAllState() {
   document.getElementById("quickBtn").classList.add("hidden");
   document.getElementById("saveBtn").classList.add("hidden");
   document.getElementById("elevationBtn").classList.add("hidden");
-  document.getElementById("targetDisplay").classList.add("hidden");
   document.getElementById("listBtn").classList.add("hidden");
   document.getElementById("recordPanel").classList.add("hidden");
   document.getElementById("recordPanel").innerHTML = "";

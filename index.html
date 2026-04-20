@@ -21,14 +21,43 @@
 
   <div id="setupPanel">
     <div class="setupBox">
-      <div>目標時間（時間）</div>
-      <input type="number" id="targetHourInput" value="22" min="0"> 時間
-      <input type="number" id="targetMinInput" value="0" min="0" max="59"> 分
+      <div>スタート予定時間</div>
+      <input type="datetime-local" id="startPlannedInput">
+
+      <div>目標時間</div>
+      <input type="number" id="targetHourInput"> 時間
+      <input type="number" id="targetMinInput"> 分
+
+      <div class="pace-input-group">
+        <label>目標初速（分/km）</label><br>
+        <input id="paceMinInput" type="number" placeholder="分" class="pace-input">
+        <input id="paceSecInput" type="number" placeholder="秒" class="pace-input">
+      </div>
+
+      <div class="rest-default-row">
+        <span>休憩時間</span>
+        <input type="number" id="restInput" value="20">
+        <span>分</span>
+        <button id="applyAllBtn">全CPに適用</button>
+      </div>
+
+      <div class="cp-rest-title">CPごとの休憩時間（分）</div>
+      <div id="cpRestContainer"></div>
+
+      <div>標高間隔（m）</div>
+      <input type="number" id="contourInput" value="100">
+
+      <div>減衰①</div>
+      <input type="number" id="decayKm1" value="100"> km
+      <input type="number" id="decayRate1" value="10"> %
+
+      <div>減衰②</div>
+      <input type="number" id="decayKm2" value="200"> km
+      <input type="number" id="decayRate2" value="30"> %
+
       <button id="startSetupBtn">設定</button>
     </div>
   </div>
-
-  <div id="targetDisplay" class="hidden"></div>
 
   <div id="map"></div>
 
@@ -43,6 +72,10 @@
   <button id="quickBtn" class="hidden">📍</button>
   <button id="elevationBtn" class="hidden">⛰</button>
   <button id="listBtn" class="hidden">📋</button>
+  <button id="configBtn" class="hidden">⚙️</button>
+
+  <button id="cpListBtn">📊</button>
+  <div id="cpListPanel" class="hidden"></div>
 
   <!-- 標高グラフ -->
   <div id="elevationContainer" class="hidden">
@@ -53,6 +86,11 @@
   <div id="infoPanel" class="panel hidden">
 
     <div id="courseName" class="panel-title"></div>
+
+    <div class="panel-section">
+      <div class="panel-title">⏱ 目標時間</div>
+      <div id="timeInfo"></div>
+    </div>
 
     <div class="panel-section">
       <div class="panel-title">📍 現在</div>
