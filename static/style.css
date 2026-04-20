@@ -399,6 +399,10 @@ button:active {
   font-size: 14px;
 }
 
+.setupBox div {
+  margin-top: 10px;
+}
+
 .setupBox input {
   width: 80px;
   margin: 10px;
@@ -511,8 +515,8 @@ button:active {
   left: 50%;
   transform: translateX(-50%);
 
-  width: 90%;
-  max-width: 400px;
+  width: 80%;
+  max-width: 350px;
   max-height: 60%;
 
   overflow-y: auto;
@@ -524,4 +528,19 @@ button:active {
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 
   z-index: 2000;
+}
+
+.cp-item {
+  border-bottom: 1px solid #ddd;
+  padding: 8px 4px;
+}
+
+.cp-name {
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.cp-time {
+  font-size: 14px;
+  margin-top: 2px;
 }

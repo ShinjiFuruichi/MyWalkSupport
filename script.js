@@ -89,6 +89,7 @@ if (savedGPX) {
 
   // ファイル選択UIを隠す
   document.getElementById("fileSelector").style.display = "none";
+  document.getElementById("configBtn").classList.remove("hidden");
 }
 
 // ファイル選択イベント
@@ -2019,24 +2020,106 @@ function renderCheckpointList() {
   const panel = document.getElementById("cpListPanel");
   panel.innerHTML = "";
 
-  const list = buildCheckpointList();
+  if (!waypoints || waypoints.length === 0) {
+    panel.innerHTML = "データなし";
+    return;
+  }
 
-  console.log("list:", list.length);
+  const list = waypoints.filter(wp =>
+    wp.type === "CHECKPOINT" || wp.type === "REST AREA"
+  );
 
-  list.forEach(item => {
+  list.forEach(wp => {
 
     const div = document.createElement("div");
     div.className = "cp-item";
 
+    const dist = getTraveledDistance(wp.routeIndex, latlngs) / 1000;
+
+    const planned = calcPlannedArrival(wp.routeIndex);
+
+    let predText = "";
+    let diffText = "";
+    let color = "black";
+
+    if (startTime) {
+      const pred = calcPrediction(
+        wp.routeIndex,
+        currentIndex,
+        latlngs,
+        startTime,
+        plannedDurationMs
+      );
+
+      predText = pred.predicted;
+      diffText = pred.diffText;
+      color = pred.color;
+    }
+
     div.innerHTML = `
-      <b>${item.name}</b>（${(item.distance/1000).toFixed(1)}km）<br>
-      予定：${item.planned}<br>
-      予測：${item.predicted}<br>
-      差分：<span style="color:${item.color}">${item.diff}</span>
+      <div class="cp-name">${wp.name}（${dist.toFixed(1)}km）</div>
+      <div class="cp-time">
+        予定：${planned}
+        ${startTime ? `<br>予測：${predText} <span style="color:${color}">${diffText}</span>` : ""}
+      </div>
     `;
 
     panel.appendChild(div);
   });
+}
+
+// UI状態更新関数
+function updateUIState() {
+
+  const hasGPX = latlngs && latlngs.length > 0;
+
+  const startBtn = document.getElementById("startBtn");
+  const configBtn = document.getElementById("configBtn");
+  const updateBtn = document.getElementById("updateBtn");
+  const endBtn = document.getElementById("endBtn");
+  const tagBtn = document.getElementById("tagBtn");
+  const quickBtn = document.getElementById("quickBtn");
+  const saveBtn = document.getElementById("saveBtn");
+  const listBtn = document.getElementById("listBtn");
+
+  // =========================
+  // ① GPXなし（初期状態）
+  // =========================
+  if (!hasGPX) {
+
+    configBtn.classList.add("hidden");
+    startBtn.classList.add("hidden");
+
+    return;
+  }
+
+  // =========================
+  // ② GPXあり（スタート前）
+  // =========================
+  configBtn.classList.remove("hidden");
+  startBtn.classList.remove("hidden");
+
+  updateBtn.classList.add("hidden");
+  endBtn.classList.add("hidden");
+  tagBtn.classList.add("hidden");
+  quickBtn.classList.add("hidden");
+  saveBtn.classList.add("hidden");
+  listBtn.classList.add("hidden");
+
+  // =========================
+  // ③ スタート後
+  // =========================
+  if (startTime) {
+
+    startBtn.classList.add("hidden");
+
+    updateBtn.classList.remove("hidden");
+    endBtn.classList.remove("hidden");
+    tagBtn.classList.remove("hidden");
+    quickBtn.classList.remove("hidden");
+    saveBtn.classList.remove("hidden");
+    listBtn.classList.remove("hidden");
+  }
 }
 
 // 記録クリア関数
