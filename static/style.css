@@ -150,20 +150,20 @@ button:active {
 #updateBtn {
   position: absolute;
   top: 10px;
-  left: 120px;
+  left: 100px;
 }
 
 #cpListBtn {
   position: absolute;
   top: 10px;
-  left: 180px;
+  left: 150px;
 }
 
 /* 終了ボタンの位置調整 */
 #endBtn {
   position: absolute;
   top: 10px;
-  right: 80px;
+  right: 70px;
 }
 
 #saveBtn {
@@ -185,13 +185,13 @@ button:active {
 #tagBtn {
   position: absolute;
   top: 10px;
-  right: 140px;
+  right: 120px;
 }
 
 #configBtn {
   position: absolute;
   top: 10px;
-  left: 60px;
+  left: 50px;
 }
 
 #quickBtn,

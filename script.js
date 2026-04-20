@@ -3,8 +3,8 @@
 //
 
 // 現在地取得関数（モックと実際の切り替え）
-//let useMockLocation = false; // スマホ実地モード
-let useMockLocation = true; // PCモックモード
+let useMockLocation = false; // スマホ実地モード
+//let useMockLocation = true; // PCモックモード
 
 let settings = {
   targetHour: 22,
