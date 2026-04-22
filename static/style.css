@@ -127,96 +127,56 @@ button:active {
   z-index: 1000;
 }
 
-/* 各種ボタンの重なり順 */
-#startBtn,
-#updateBtn,
-#endBtn,
-#saveBtn,
-#configBtn,
-#cpListBtn,
-#tagBtn {
-  z-index: 1100;
-}
-
 /* 開始ボタンの位置調整 */
 #startBtn {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  z-index: 1500; 
 }
 
-/* 更新ボタンの位置調整 */
-#updateBtn {
-  position: absolute;
-  top: 10px;
-  left: 100px;
-}
-
-#cpListBtn {
-  position: absolute;
-  top: 10px;
-  left: 150px;
-}
-
-/* 終了ボタンの位置調整 */
-#endBtn {
-  position: absolute;
-  top: 10px;
-  right: 70px;
-}
-
-#saveBtn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-
-  width: auto;
-  height: auto;
-
-  padding: 8px 12px;
-
-  background: black;
-  color: white;
-
-  border-radius: 8px;
-}
-
-#tagBtn {
-  position: absolute;
-  top: 10px;
-  right: 120px;
-}
-
-#configBtn {
+#controlButtonsTop {
   position: absolute;
   top: 10px;
   left: 50px;
-}
+  display: flex;
+  gap: 10px;
 
-#quickBtn,
-#listBtn,
-#elevationBtn {
-  z-index: 1200;
-}
+  z-index: 1000;
+} 
 
-#quickBtn {
+#controlButtonsRightUp {
   position: absolute;
-  bottom: 240px;
+  top: 10px;
   right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  z-index: 1100;
+} 
+
+#saveBtn {
+  width: auto;
+  height: auto;
+  padding: 8px 12px;
+  background: black;
+  color: white;
+  border-radius: 8px;
 }
 
-#listBtn {
-  position: absolute;
-  bottom: 300px;
-  right: 10px;
-}
-
-#elevationBtn {
+#controlButtonsRightDown {
   position: absolute;
   bottom: 180px;
   right: 10px;
-}
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  z-index: 1200;
+} 
 
 #applyAllBtn {
   background: #eee;
@@ -437,7 +397,8 @@ button:active {
   padding: 6px;
   box-sizing: border-box;
 }
-.record-panel {
+
+#recordPanel {
   position: absolute;
   bottom: 80px;
   left: 50%;
@@ -453,7 +414,7 @@ button:active {
   border-radius: 10px;
   padding: 12px;
 
-  z-index: 1000;
+  z-index: 3000;
   font-size: 14px;
 }
 

@@ -14,15 +14,25 @@
 </head>
 
 <body>
-  <div id="fileSelector">
+  <div id="fileSelector" class="hidden">
     <label for="gpxFileInput" class="fileBtn">コース選択</label>
     <input type="file" id="gpxFileInput" accept=".gpx">
   </div>
 
-  <div id="setupPanel">
+  <div id="setupPanel" style="display:none;">
     <div class="setupBox">
       <div>スタート予定時間</div>
-      <input type="datetime-local" id="startPlannedInput">
+      <input type="time" id="startPlannedInput"><br>
+
+      <label>
+        <input type="radio" name="mode" value="time" checked>
+        目標時間
+      </label>
+
+      <label>
+        <input type="radio" name="mode" value="pace">
+        初速
+      </label>
 
       <div>目標時間</div>
       <input type="number" id="targetHourInput"> 時間
@@ -47,11 +57,11 @@
       <div>標高間隔（m）</div>
       <input type="number" id="contourInput" value="100">
 
-      <div>減衰①</div>
+      <div>疲労による速度の減衰①</div>
       <input type="number" id="decayKm1" value="100"> km
       <input type="number" id="decayRate1" value="10"> %
 
-      <div>減衰②</div>
+      <div>疲労による速度の減衰②</div>
       <input type="number" id="decayKm2" value="200"> km
       <input type="number" id="decayRate2" value="30"> %
 
@@ -63,19 +73,24 @@
 
   <div id="status"></div>
 
-  <!-- スタートボタン（常に表示） -->
+  <!-- ボタン -->
   <button id="startBtn" class="hidden">▶</button>
-  <button id="updateBtn" class="hidden">↻</button>
-  <button id="endBtn" class="hidden">■</button>
-  <button id="tagBtn" class="hidden">Tag</button>
-  <button id="saveBtn" class="hidden">💾</button>
-  <button id="quickBtn" class="hidden">📍</button>
-  <button id="elevationBtn" class="hidden">⛰</button>
-  <button id="listBtn" class="hidden">📋</button>
-  <button id="configBtn" class="hidden">⚙️</button>
 
-  <button id="cpListBtn">📊</button>
-  <div id="cpListPanel" class="hidden"></div>
+  <div id="controlButtonsTop">
+    <button id="configBtn" class="hidden">⚙️</button>
+    <button id="cpListBtn" class="hidden">📊</button>
+    <button id="updateBtn" class="hidden">↻</button>
+    <button id="tagBtn" class="hidden">Tag</button>
+  </div>
+  <div id="controlButtonsRightUp">
+    <button id="saveBtn" class="hidden">💾</button>
+    <button id="endBtn" class="hidden">■</button>
+  </div>
+  <div id="controlButtonsRightDown">
+    <button id="listBtn" class="hidden">📋</button>
+    <button id="elevationBtn" class="hidden">⛰</button>
+    <button id="quickBtn" class="hidden">📍</button>
+  </div>
 
   <!-- 標高グラフ -->
   <div id="elevationContainer" class="hidden">
@@ -88,7 +103,7 @@
     <div id="courseName" class="panel-title"></div>
 
     <div class="panel-section">
-      <div class="panel-title">⏱ 目標時間</div>
+      <div class="panel-title">⏱ 時間</div>
       <div id="timeInfo"></div>
     </div>
 
@@ -104,11 +119,10 @@
     </div>
 
     <div class="panel-section">
-      <div class="panel-title">⏱ 時間</div>
-      <div id="timeInfo"></div>
+      <div class="panel-title">⏱ ゴール時間</div>
+      <div id="result"></div>
     </div>
 
-    <div id="result"></div>
   </div>
 
   <!-- タグメニュー -->
@@ -123,7 +137,10 @@
 
   </div>
   <!-- 記録リスト -->
-  <div id="recordPanel" class="hidden record-panel"></div>
+  <div id="overlayPanels">
+    <div id="cpListPanel" class="hidden"></div>
+    <div id="recordPanel" class="hidden"></div>
+  </div>
 
   <!-- Leaflet -->
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
