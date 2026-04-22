@@ -45,9 +45,17 @@ const REST_TYPES = ["CHECKPOINT", "REST AREA"];
 
 // 地図初期化
 const map = L.map('map').setView([35.0, 135.0], 13);
-window.addEventListener("resize", () => {
-  map.invalidateSize();
-});
+function refreshMapSize() {
+  if (!map) return;
+
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 100);
+}
+
+// ★イベント登録
+window.addEventListener("resize", refreshMapSize);
+window.addEventListener("orientationchange", refreshMapSize);
 
 // 地図タイル
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
