@@ -45,6 +45,9 @@ const REST_TYPES = ["CHECKPOINT", "REST AREA"];
 
 // 地図初期化
 const map = L.map('map').setView([35.0, 135.0], 13);
+window.addEventListener("resize", () => {
+  map.invalidateSize();
+});
 
 // 地図タイル
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -157,6 +160,9 @@ document.getElementById("gpxFileInput").addEventListener("change", (e) => {
     
     updateUIState("beforeStart");
     document.getElementById("setupPanel").style.display = "flex";
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
   };
 
   reader.readAsText(file);
@@ -295,6 +301,9 @@ document.getElementById("startSetupBtn").onclick = () => {
   // UI閉じる
   // =========================
   document.getElementById("setupPanel").style.display = "none";
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 100);
 
   console.log("設定保存:", settings);
 
@@ -370,6 +379,9 @@ paceSecInput.addEventListener("input", () => {
 // ===== 保存データ読み込み =====
 loadRecords();
 document.getElementById("setupPanel").style.display = "none";
+setTimeout(() => {
+  map.invalidateSize();
+}, 100);
 
 //
 // ===== イベント =====
@@ -442,6 +454,9 @@ document.getElementById("updateBtn").onclick = () => {
 
     const panel = document.getElementById("infoPanel");
     panel.classList.remove("hidden");
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
   });
 };
 
@@ -634,6 +649,9 @@ document.getElementById("configBtn").onclick = () => {
   applySettingsToUI();
   renderCpRestInputs();
   document.getElementById("setupPanel").style.display = "flex";
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 100);
 
   console.log("state beforeStart");
   console.log(document.getElementById("startBtn").className);
