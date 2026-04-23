@@ -2504,6 +2504,7 @@ function updateUIState(state) {
     show("configBtn");
     show("cpListBtn");
     show("elevationBtn");
+    show("fileSelector");
   }
 
   if (state === "started") {

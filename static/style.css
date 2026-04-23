@@ -348,7 +348,7 @@ button:active {
   max-height: 70vh;   /* ←これ重要 */
   overflow-y: auto;   /* ←スクロール可能にする */
   width: 80%;
-  max-width: 350px;
+  max-width: 400px;
 
   position: absolute;
   bottom: 40px;
@@ -356,7 +356,7 @@ button:active {
   transform: translateX(-50%);
 
   z-index: 3000;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .setupBox div {
@@ -366,7 +366,7 @@ button:active {
 .setupBox input {
   width: 80px;
   margin: 10px;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .setupBox button {
@@ -374,7 +374,7 @@ button:active {
   padding: 10px 0;          /* 縦の余白 */
   margin-top: 10px;
 
-  font-size: 14px;
+  font-size: 16px;
   border: none;
   border-radius: 8px;
 
@@ -393,9 +393,30 @@ button:active {
 
 #startPlannedInput {
   width: 60%;
-  font-size: 14px;
+  font-size: 16px;
   padding: 6px;
   box-sizing: border-box;
+}
+
+#cpListPanel {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  width: 90%;
+  max-width: 350px;
+  max-height: 60%;
+
+  overflow-y: auto;
+
+  background: rgba(255,255,255,0.95);
+  border-radius: 10px;
+  padding: 12px;
+
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+
+  z-index: 2000;
 }
 
 #recordPanel {
@@ -415,7 +436,7 @@ button:active {
   padding: 12px;
 
   z-index: 3000;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 .record-item {
@@ -426,7 +447,7 @@ button:active {
 .cp-rest-title {
   margin-top: 10px;
   font-weight: bold;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 #cpRestContainer {
@@ -443,16 +464,40 @@ button:active {
 }
 
 .cp-rest-row span {
-  font-size: 13px;
+  font-size: 16px;
+}
+
+.cp-rest-row span:first-child {
+  flex: 1;           /* ← 名前は可変 */
+  text-align: left;
 }
 
 .cp-rest-row input {
-  width: 40px;
-  font-size: 13px;
+  width: 50px;
+  font-size: 16px;
   padding: 2px 4px;
-  text-align: center;
+  text-align: right;
 }
 
+.cp-rest-row span:last-child {
+  width: 30px;       /* ← 「分」を固定幅 */
+  text-align: right;
+}
+
+.cp-item {
+  border-bottom: 1px solid #ddd;
+  padding: 8px 4px;
+}
+
+.cp-name {
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.cp-time {
+  font-size: 16px;
+  margin-top: 2px;
+}
 .rest-default-row {
   display: flex;
   align-items: center;
@@ -468,40 +513,4 @@ button:active {
 .pace-input {
   width: 60px;
   margin-right: 5px;
-}
-
-#cpListPanel {
-  position: absolute;
-  top: 70px;
-  left: 50%;
-  transform: translateX(-50%);
-
-  width: 80%;
-  max-width: 350px;
-  max-height: 60%;
-
-  overflow-y: auto;
-
-  background: rgba(255,255,255,0.95);
-  border-radius: 10px;
-  padding: 12px;
-
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-
-  z-index: 2000;
-}
-
-.cp-item {
-  border-bottom: 1px solid #ddd;
-  padding: 8px 4px;
-}
-
-.cp-name {
-  font-weight: bold;
-  font-size: 15px;
-}
-
-.cp-time {
-  font-size: 14px;
-  margin-top: 2px;
 }
