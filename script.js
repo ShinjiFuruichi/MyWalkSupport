@@ -48,9 +48,7 @@ const map = L.map('map').setView([35.0, 135.0], 13);
 function refreshMapSize() {
   if (!map) return;
 
-  setTimeout(() => {
-    map.invalidateSize();
-  }, 100);
+  refreshMap();
 }
 
 // ★イベント登録
@@ -168,9 +166,7 @@ document.getElementById("gpxFileInput").addEventListener("change", (e) => {
     
     updateUIState("beforeStart");
     document.getElementById("setupPanel").style.display = "flex";
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
+    refreshMap();
   };
 
   reader.readAsText(file);
@@ -309,9 +305,7 @@ document.getElementById("startSetupBtn").onclick = () => {
   // UI閉じる
   // =========================
   document.getElementById("setupPanel").style.display = "none";
-  setTimeout(() => {
-    map.invalidateSize();
-  }, 100);
+  refreshMap();
 
   console.log("設定保存:", settings);
 
@@ -387,9 +381,7 @@ paceSecInput.addEventListener("input", () => {
 // ===== 保存データ読み込み =====
 loadRecords();
 document.getElementById("setupPanel").style.display = "none";
-setTimeout(() => {
-  map.invalidateSize();
-}, 100);
+refreshMap();
 
 //
 // ===== イベント =====
@@ -462,9 +454,7 @@ document.getElementById("updateBtn").onclick = () => {
 
     const panel = document.getElementById("infoPanel");
     panel.classList.remove("hidden");
-    setTimeout(() => {
-      map.invalidateSize();
-    }, 100);
+    refreshMap();
   });
 };
 
@@ -476,19 +466,9 @@ document.getElementById("quickBtn").onclick = () => {
     const record = buildRecord([]);
     if (!record) return;
 
-    record.id = Date.now();
-    records.push(record);
-
-    localStorage.setItem("records", JSON.stringify(records));
+    saveRecord(record);
 
     updateCurrentPosition(current, latlngs);
-
-    showStatus("✔ 記録");
-
-    if (!document.getElementById("recordPanel").classList.contains("hidden")) {
-      renderRecordList();
-    }
-
   });
 };
 
@@ -567,29 +547,13 @@ document.getElementById("closeTag").onclick = () => {
 
   const record = buildRecord(currentRecord.tags);
   if (!record) return;
-  record.id = Date.now();
-  records.push(record);
-
-  localStorage.setItem("records", JSON.stringify(records));
+  
+  saveRecord(record);
 
   document.getElementById("tagPanel").classList.add("hidden");
 
   resetTagUI();
   currentRecord = null;
-
-  const statusEl = document.getElementById("status");
-  statusEl.textContent = "✔ タグ記録";
-  statusEl.style.opacity = 1;
-
-  setTimeout(() => {
-    statusEl.style.opacity = 0;
-  }, 1500);
-
-  const recordPanel = document.getElementById("recordPanel");
-  if (!recordPanel.classList.contains("hidden")) {
-    renderRecordList();
-  }
-
 };
 
 createTagUI();
@@ -611,28 +575,12 @@ document.getElementById("tagPanel").onclick = (e) => {
   const record = buildRecord(currentRecord.tags);
   if (!record) return;
 
-  record.id = Date.now();
-  records.push(record);
-
-  localStorage.setItem("records", JSON.stringify(records));
+  saveRecord(record);
 
   document.getElementById("tagPanel").classList.add("hidden");
 
   resetTagUI();
   currentRecord = null;
-
-  const statusEl = document.getElementById("status");
-  statusEl.textContent = "✔ タグ記録";
-  statusEl.style.opacity = 1;
-
-  setTimeout(() => {
-    statusEl.style.opacity = 0;
-  }, 1500);
-
-  const recordPanel = document.getElementById("recordPanel");
-  if (!recordPanel.classList.contains("hidden")) {
-    renderRecordList();
-  }
 };
 
 // 情報パネルを閉じるボタン
@@ -657,9 +605,7 @@ document.getElementById("configBtn").onclick = () => {
   applySettingsToUI();
   renderCpRestInputs();
   document.getElementById("setupPanel").style.display = "flex";
-  setTimeout(() => {
-    map.invalidateSize();
-  }, 100);
+  refreshMap();
 
   console.log("state beforeStart");
   console.log(document.getElementById("startBtn").className);
@@ -1056,18 +1002,7 @@ function updateCurrentPosition(current, latlngs) {
     `残り：${(remaining / 1000).toFixed(2)} km`;
 
   // =========================
-  // ④ ペース計算
-  // =========================
-  //const pace = calcRequiredPace();
-  //const restTotal = calcTotalRestTime();
-  //let paceText = "--";
-  //if (pace) {
-  //  paceText = `${pace.speed}km/h（${pace.pace}）`;
-  //}
-  //const targetText = `${settings.targetHour}時間${settings.targetMin}分`;
-
-  // =========================
-  // ⑤ 時間表示
+  // ④ 時間表示
   // =========================
   if (startTime) {
 
@@ -1086,7 +1021,7 @@ function updateCurrentPosition(current, latlngs) {
   }
 
   // =========================
-  // ⑥ ゴール表示
+  // ⑤ ゴール表示
   // =========================
   const goalIndex = latlngs.length - 1;
   const planned = calcPlannedArrival(goalIndex);
@@ -1112,7 +1047,7 @@ function updateCurrentPosition(current, latlngs) {
      ${predText}`;
 
   // =========================
-  // ⑦ 次の目的地
+  // ⑥ 次の目的地
   // =========================
   const { nextStop, nextCP } = getNextTargets(
     currentIndex,
@@ -1216,33 +1151,6 @@ function showStartPosition(latlngs) {
   }
 
   map.setView(start, 15);
-}
-
-// モック位置更新関数
-function simulatePosition() {
-  if (latlngs.length === 0) return;
-
-  const point = latlngs[currentIndex];
-
-  if (window.currentMarker) {
-    window.currentMarker.setLatLng(point);
-  } else {
-    window.currentMarker = L.circleMarker(point, {
-      radius: 8,
-      color: "red"
-    }).addTo(map);
-  }
-
-  map.setView(point, 15);
-
-  currentIndex += 5;  
-
-  if (currentIndex >= latlngs.length) {
-    currentIndex = 0;
-  }
-
-  const remaining = getRemainingDistance(currentIndex, latlngs);
-  console.log("残距離(m):", remaining);
 }
 
 // 距離関数
@@ -1469,25 +1377,6 @@ function showSlopePopup(x, y, slope, ele) {
   setTimeout(() => popup.remove(), 2000);
 }
 
-// 次のチェックポイントを探す関数
-function findNextWaypoint(currentIndex, latlngs, waypoints) {
-  let next = null;
-  let minIndex = Infinity;
-
-  waypoints.forEach(wp => {
-    const res = findNearestIndex([wp.lat, wp.lon], latlngs);
-
-    if (res.index >= currentIndex && res.index < minIndex) {
-      minIndex = res.index;
-      next = {
-        ...wp,
-        routeIndex: res.index
-      };
-    }
-  });
-
-  return next;
-}
 // 時間表示関数
 function formatTime(ms) {
   const totalSec = Math.floor(ms / 1000);
@@ -1612,7 +1501,7 @@ function toggleTag(btn, label) {
 
   document.getElementById("status").textContent =
     currentRecord.tags.join(" / ");
-  }
+}
 
 // 次のチェックポイントを探す関数
 function findNextCP(currentIndex, latlngs, waypoints) {
@@ -1726,23 +1615,6 @@ function generateDistancePoints(latlngs, intervalKm = 10) {
   }
 
   return points;
-}
-
-// 次の距離ポイントを探す関数
-function findNextDistancePoint(currentIndex, waypoints) {
-  let next = null;
-  let minIndex = Infinity;
-
-  waypoints.forEach(wp => {
-    if (wp.type !== "DISTANCE") return;
-
-    if (wp.routeIndex > currentIndex && wp.routeIndex < minIndex) {
-      minIndex = wp.routeIndex;
-      next = wp;
-    }
-  });
-
-  return next;
 }
 
 // 起動時に係数計算
@@ -1912,20 +1784,6 @@ function calcRequiredPace() {
   };
 }
 
-// ゴールまでの必要時間をペースから計算する関数
-function calcGoalTimeFromPace(paceMinPerKm) {
-
-  const totalKm = getTotalDistance(latlngs) / 1000;
-
-  const movingHour = (paceMinPerKm * totalKm) / 60;
-
-  const restHour = calcTotalRestTime() / 60;
-
-  const totalHour = movingHour + restHour;
-
-  return totalHour;
-}
-
 // 目標時間から必要なペースを逆算する関数
 function findBaseSpeed(totalKm, movingHour) {
 
@@ -1959,11 +1817,6 @@ function updatePlannedBaseSpeed() {
   plannedBaseSpeed = findBaseSpeed(totalKm, movingHour);
 
   console.log("初速更新:", plannedBaseSpeed);
-}
-
-function paceToSpeed(min, sec) {
-  const paceMin = min + sec / 60;
-  return 60 / paceMin;
 }
 
 // 計画開始日時取得関数
@@ -2068,6 +1921,23 @@ function saveSettings() {
   localStorage.setItem("settings", JSON.stringify(settings));
 }
 
+// 記録保存関数
+function saveRecord(record) {
+  if (!record) return;
+
+  record.id = Date.now();
+
+  records.push(record);
+  localStorage.setItem("records", JSON.stringify(records));
+
+  // UI更新
+  if (!document.getElementById("recordPanel").classList.contains("hidden")) {
+    renderRecordList();
+  }
+
+  showStatus("✔ 記録");
+}
+
 // 設定読み込み関数
 function loadSettings() {
   const saved = localStorage.getItem("settings");
@@ -2112,55 +1982,6 @@ function loadSettings() {
     console.error("settings復元失敗:", e);
   }
 }
-
-// 計画を計算する関数（初速や目標時間から必要なペースを算出）未使用
-function calculatePlan() {
-
-  const totalKm = getTotalDistance(latlngs) / 1000;
-  const restHour = calcTotalRestTime() / 60;
-
-  if (settings.mode === "pace") {
-
-    const paceMin = Number(paceMinInput.value) || 0;
-    const paceSec = Number(paceSecInput.value) || 0;
-
-    const pace = paceMin + paceSec / 60;
-
-    if (pace <= 0) {
-      alert("初速を入れてね");
-      return false;
-    }
-
-    plannedBaseSpeed = 60 / pace;
-
-    const movingHour = pace * totalKm / 60;
-    const totalHour = movingHour + restHour;
-
-    settings.targetHour = Math.floor(totalHour);
-    settings.targetMin = Math.round((totalHour % 1) * 60);
-
-  } else {
-
-    const hour = Number(targetHourInput.value) || 0;
-    const min  = Number(targetMinInput.value) || 0;
-
-    const totalHour = hour + min / 60;
-
-    settings.targetHour = hour;
-    settings.targetMin = min;
-
-    const movingHour = totalHour - restHour;
-    plannedBaseSpeed = findBaseSpeed(totalKm, movingHour);
-  }
-
-  plannedDurationMs =
-    (settings.targetHour + settings.targetMin / 60) * 3600 * 1000;
-
-  initDecayParams();
-
-  return true;
-}
-
 
 // 設定をUIに反映する関数
 function applySettingsToUI() {
@@ -2533,6 +2354,11 @@ function showStatus(msg) {
   setTimeout(() => {
     statusEl.style.opacity = 0;
   }, 2000);
+}
+
+// マップリフレッシュ関数（Leafletのサイズ不具合対策）
+function refreshMap() {
+  setTimeout(() => map.invalidateSize(), 100);
 }
 
 // 記録クリア関数
