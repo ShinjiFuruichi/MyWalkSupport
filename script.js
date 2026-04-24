@@ -2138,7 +2138,10 @@ function renderCheckpointList() {
     <div>スタート：${startText}</div>
     <div>目標：${settings.targetHour}時間${settings.targetMin}分</div>
     <div>休憩：${restTotal}分</div>
-    <div>初速：${pace ? pace.speed + "km/h" : "--"}</div>
+    <div>
+      初速：${pace ? pace.speed + "km/h" : "--"} 
+      （${pace ? pace.pace : "--"}）
+    </div>
     <hr>
   `;
 
@@ -2335,7 +2338,6 @@ function updateUIState(state) {
     show("saveBtn");
     show("quickBtn");
     show("listBtn");
-    show("configBtn");
     show("cpListBtn");
     show("elevationBtn");
   }
