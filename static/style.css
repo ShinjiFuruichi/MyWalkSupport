@@ -37,61 +37,13 @@ html, body {
   transition: opacity 0.2s;
 }
 
-/* パネル */
-.panel {
-  position: absolute;
-  bottom: 10px;
-  left: 10px;
-  width: 280px;
-  background: rgba(255, 255, 255, 0.95);
-  padding: 16px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-  font-size: 18px;
-  line-height: 1.5;
-  z-index: 3000;
-  font-family: sans-serif;
-
-  transition: all 0.2s ease;
+/* 非表示 */
+.hidden {
+  display: none;
 }
 
-/* セクション */
-.panel-section {
-  margin-bottom: 10px;
-}
-.panel-section div {
-  margin: 4px 0;
-}
 
-/* タイトル */
-.panel-title {
-  font-weight: bold;
-  font-size: 14px;
-  font-weight: bold;
-  margin-bottom: 4px;
-  border-bottom: 1px solid #ddd;
-}
-
-/* ボタンエリア */
-.panel-buttons {
-  margin-top: 10px;
-}
-
-#progress,
-#remaining,
-#next,
-#timeInfo {
-  font-size: 18px;
-  font-weight: bold;
-} 
-
-#result  {
-  font-weight: bold;
-  font-size: 18px;
-  color: #d9534f; /* 赤系 */
-}
-
-/* ボタン */
+/* ===== 基本ボタン ===== */
 button {
   width: 44px;
   height: 44px;
@@ -114,120 +66,7 @@ button:active {
   transform: scale(0.95);
 }
 
-/* 非表示 */
-.hidden {
-  display: none;
-}
-
-/* 画面右上の更新ボタン */
-.floating-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  z-index: 1000;
-}
-
-/* 開始ボタンの位置調整 */
-#startBtn {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 1500; 
-}
-
-#controlButtonsTop {
-  position: absolute;
-  top: 10px;
-  left: 50px;
-  display: flex;
-  gap: 10px;
-
-  z-index: 1000;
-} 
-
-#controlButtonsRightUp {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-
-  z-index: 1100;
-} 
-
-#saveBtn {
-  width: auto;
-  height: auto;
-  padding: 8px 12px;
-  background: black;
-  color: white;
-  border-radius: 8px;
-}
-
-#controlButtonsRightDown {
-  position: absolute;
-  bottom: 180px;
-  right: 10px;
-
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-
-  z-index: 1200;
-} 
-
-#applyAllBtn {
-  background: #eee;
-  color: #333;
-  border: 1px solid #ccc;
-}
-
-.tag-title {
-  font-weight: bold;
-  font-size: 14px;
-}
-
-.tag-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: white;
-  font-size: 18px;
-}
-
-/* タグ選択パネル */
-.tag-panel {
-  position: absolute;
-  bottom: 80px;
-
-  left: 50%;
-  transform: translateX(-50%);
-
-  width: 94%;
-  max-width: 400px;
-
-  background: rgba(0,0,0,0.85);
-  color: white;
-
-  padding: 12px;
-  border-radius: 10px;
-
-  z-index: 3000;
-}
-
-.tag-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
+/* ===== 小ボタン（タグなど） ===== */
 .tag-panel button {
   width: auto;
   height: auto;
@@ -242,59 +81,59 @@ button:active {
   background: orange;
 }
 
-#tagMenu button {
-  margin: 5px;
+#startBtn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1500; 
+}
+
+#saveBtn {
+  width: auto;
+  height: auto;
   padding: 8px 12px;
+  background: black;
+  color: white;
   border-radius: 8px;
 }
 
-#tagMenu button.selected {
-  background-color: orange;
-  color: white;
-  transform: scale(1.1);
-}
-
-.next-stop {
-  color: #00aa00; /* 緑 */
-}
-
-.next-cp {
-  color: #00aa00; /* 緑 */
-}
-
-.next-kp {
-  color: purple;
-}
-
-#elevationContainer {
+#controlButtonsTop {
   position: absolute;
+  top: 10px;
+  left: 50px;
+  display: flex;
+  gap: 10px;
+  z-index: 1000;
+} 
 
-  bottom: 20px;     /* ← 少し上に浮かせる */
-  left: 1%;         /* ← 左右に余白 */
-  width: 98%;       /* ← 横幅縮める */
-  height: 140px;
+#controlButtonsRightUp {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1100;
+} 
 
-  background: linear-gradient(
-    to bottom,
-    rgba(180, 220, 255, 0.8),
-    rgba(230, 245, 255, 0.8)
-  );
-
-  border-radius: 12px;        /* ← 角丸 */
-  border: 1px solid rgba(100, 150, 200, 0.5);
-
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* ← 浮き感 */
-
+#controlButtonsRightDown {
+  position: absolute;
+  bottom: 180px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   z-index: 1200;
+} 
 
-  transition: all 0.3s ease;
+#applyAllBtn {
+  background: #eee;
+  color: #333;
+  border: 1px solid #ccc;
 }
 
-#elevationChart {
-  width: 100%;
-  height: 100%;
-}
-
+/* ファイル選択ボタン */
 #fileSelector {
   position: absolute;
   top: 40%;
@@ -305,13 +144,11 @@ button:active {
   background: white;
   padding: 6px 10px;
   border-radius: 8px;
-
   box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 #fileSelector input {
   display: none;
 }
-
 .fileBtn {
   display: inline-block;
   padding: 6px 12px;
@@ -320,141 +157,117 @@ button:active {
   border-radius: 6px;
   cursor: pointer;
 }
-
 .fileBtn:hover {
   background: #45a049;
 }
 
+/* ===== パネル ===== */
+/* infoPanel */
+.panel {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  font-size: 18px;
+  line-height: 1.5;
+  z-index: 3000;
+  font-family: sans-serif;
+
+  transition: all 0.2s ease;
+}
+.panel-section {
+  margin-bottom: 10px;
+}
+.panel-section div {
+  margin: 4px 0;
+}
+.panel-title {
+  font-weight: bold;
+  font-size: 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #ddd;
+}
+
+#progress,
+#remaining,
+#next,
+#timeInfo {
+  font-size: 18px;
+  font-weight: bold;
+} 
+#result  {
+  font-weight: bold;
+  font-size: 18px;
+  color: #d9534f; /* 赤系 */
+}
+
+/* tagPanel */
+.tag-panel {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 94%;
+  max-width: 400px;
+  background: rgba(0,0,0,0.85);
+  color: white;
+  padding: 12px;
+  border-radius: 10px;
+  z-index: 3000;
+}
+.tag-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+.tag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.tag-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.close-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 18px;
+}
+
+/* setupPanel */
 #setupPanel {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-
   background: rgba(0,0,0,0.4);
   z-index: 2000;
-
   display: none;
   justify-content: center;
   align-items: center;
 }
-
-.setupBox {
-  background: white;
-  padding: 12px;
-  border-radius: 12px;
-  text-align: center;
-  max-height: 70vh;   /* ←これ重要 */
-  overflow-y: auto;   /* ←スクロール可能にする */
-  width: 80%;
-  max-width: 400px;
-
-  position: absolute;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-
-  z-index: 3000;
-  font-size: 16px;
-}
-
-.setupBox div {
-  margin-top: 10px;
-}
-
-.setupBox input {
-  width: 80px;
-  margin: 10px;
-  font-size: 16px;
-}
-
-.setupBox button {
-  width: 100%;              /* 横いっぱい */
-  padding: 10px 0;          /* 縦の余白 */
-  margin-top: 10px;
-
-  font-size: 16px;
-  border: none;
-  border-radius: 8px;
-
-  background: #4CAF50;
-  color: white;
-  cursor: pointer;
-}
-
-.setupBox button:hover {
-  background: #45a049;
-}
-
-.setupBox button:active {
-  transform: scale(0.98);
-}
-
 #startPlannedInput {
   width: 60%;
   font-size: 16px;
   padding: 6px;
   box-sizing: border-box;
 }
-
-#cpListPanel {
-  position: absolute;
-  top: 70px;
-  left: 50%;
-  transform: translateX(-50%);
-
-  width: 90%;
-  max-width: 350px;
-  max-height: 60%;
-
-  overflow-y: auto;
-
-  background: rgba(255,255,255,0.95);
-  border-radius: 10px;
-  padding: 12px;
-
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-
-  z-index: 2000;
+#cpRestContainer {
+  margin-top: 6px;
+  text-align: left;
 }
-
-#recordPanel {
-  position: absolute;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-
-  width: 85%;
-  max-width: 350px;
-  max-height: 50%;
-
-  overflow-y: auto;
-
-  background: rgba(255,255,255,0.95);
-  border-radius: 10px;
-  padding: 12px;
-
-  z-index: 3000;
-  font-size: 16px;
-}
-
-.record-item {
-  border-bottom: 1px solid #ddd;
-  padding: 6px 0;
-}
-
 .cp-rest-title {
   margin-top: 10px;
   font-weight: bold;
   font-size: 16px;
 }
-
-#cpRestContainer {
-  margin-top: 6px;
-  text-align: left;
-}
-
 .cp-rest-row {
   margin: 1px 0;      /* ←ここ詰める */
   display: flex;
@@ -462,38 +275,60 @@ button:active {
   justify-content: space-between;
   gap: 6px;           /* ←少しだけ詰める */
 }
-
 .cp-rest-row span {
   font-size: 16px;
 }
-
 .cp-rest-row span:first-child {
   flex: 1;           /* ← 名前は可変 */
   text-align: left;
 }
-
 .cp-rest-row input {
   width: 50px;
   font-size: 16px;
   padding: 2px 4px;
   text-align: right;
 }
-
 .cp-rest-row span:last-child {
   width: 30px;       /* ← 「分」を固定幅 */
   text-align: right;
 }
+.pace-input-group {
+  margin-top: 10px;
+}
+.pace-input {
+  width: 60px;
+  margin-right: 5px;
+}
 
+
+/* cpListPanel, recordPanel */
+.over-panel {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 380px;
+  max-height: 60%;
+  overflow-y: auto;
+  background: rgba(255,255,255,0.95);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 2000;
+
+}
+
+#cpListPanel {
+  top: 80px;
+}
 .cp-item {
   border-bottom: 1px solid #ddd;
   padding: 8px 4px;
 }
-
 .cp-name {
   font-weight: bold;
   font-size: 16px;
 }
-
 .cp-time {
   font-size: 16px;
   margin-top: 2px;
@@ -505,12 +340,77 @@ button:active {
   margin-top: 6px;
 }
 
-/* ペース入力 */
-.pace-input-group {
-  margin-top: 10px;
+#recordPanel {
+  bottom: 80px;
+}
+.record-item {
+  border-bottom: 1px solid #ddd;
+  padding: 6px 0;
 }
 
-.pace-input {
-  width: 60px;
-  margin-right: 5px;
+/* setupPanel */
+.setupBox {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: white;
+  padding: 12px;
+  border-radius: 12px;
+  text-align: center;
+  max-height: 70vh;
+  overflow-y: auto;
+  width: 80%;
+  max-width: 400px;
+  z-index: 3000;
+  font-size: 16px;
+}
+.setupBox div {
+  margin-top: 10px;
+}
+.setupBox input {
+  width: 80px;
+  margin: 10px;
+  font-size: 16px;
+}
+.setupBox button {
+  width: 100%;        
+  padding: 10px 0;  
+  margin-top: 10px;
+  font-size: 16px;
+  border: none;
+  border-radius: 8px;
+  background: #4CAF50;
+  color: white;
+  cursor: pointer;
+}
+.setupBox button:hover {
+  background: #45a049;
+}
+.setupBox button:active {
+  transform: scale(0.98);
+}
+
+/* 標高グラフ */
+#elevationContainer {
+  position: absolute;
+  bottom: 20px; 
+  left: 1%; 
+  width: 98%; 
+  height: 140px;
+  background: linear-gradient(
+    to bottom,
+    rgba(180, 220, 255, 0.8),
+    rgba(230, 245, 255, 0.8)
+  );
+
+  border-radius: 12px;        /* ← 角丸 */
+  border: 1px solid rgba(100, 150, 200, 0.5);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2); /* ← 浮き感 */
+  z-index: 1200;
+  transition: all 0.3s ease;
+}
+#elevationChart {
+  width: 100%;
+  height: 100%;
 }
