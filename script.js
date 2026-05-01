@@ -1998,6 +1998,9 @@ function applySettingsToUI() {
   targetHourInput.value = settings.targetHour;
   targetMinInput.value = settings.targetMin;
 
+  document.getElementById("contourInput").value =
+  settings.contourInterval ?? 100;
+
   document.getElementById("decayKm1").value =
     settings.decayPoints?.[0]?.km ?? 100;
 
