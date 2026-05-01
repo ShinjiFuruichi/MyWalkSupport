@@ -1998,23 +1998,35 @@ function applySettingsToUI() {
   targetHourInput.value = settings.targetHour;
   targetMinInput.value = settings.targetMin;
 
+  document.getElementById("decayKm1").value =
+    settings.decayPoints?.[0]?.km ?? 100;
+
+  document.getElementById("decayRate1").value =
+    Math.round((settings.decayPoints?.[0]?.rate ?? 0.10) * 100);
+
+  document.getElementById("decayKm2").value =
+    settings.decayPoints?.[1]?.km ?? 200;
+
+  document.getElementById("decayRate2").value =
+    Math.round((settings.decayPoints?.[1]?.rate ?? 0.30) * 100);
+
   const modeRadio =
     document.querySelector(`input[name="mode"][value="${settings.mode}"]`);
   if (modeRadio) modeRadio.checked = true;
 
   if (settings.mode === "pace" && plannedBaseSpeed) {
-  const paceMinValue = 60 / plannedBaseSpeed;
-  let min = Math.floor(paceMinValue);
-  let sec = Math.round((paceMinValue - min) * 60);
+    const paceMinValue = 60 / plannedBaseSpeed;
+    let min = Math.floor(paceMinValue);
+    let sec = Math.round((paceMinValue - min) * 60);
 
-  if (sec === 60) {
-    min += 1;
-    sec = 0;
+    if (sec === 60) {
+      min += 1;
+      sec = 0;
+    }
+
+    document.getElementById("paceMinInput").value = min;
+    document.getElementById("paceSecInput").value = sec;
   }
-
-  document.getElementById("paceMinInput").value = min;
-  document.getElementById("paceSecInput").value = sec;
-}
 
   updateModeUI();
 }
