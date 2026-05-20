@@ -2175,6 +2175,7 @@ function renderCheckpointList() {
     div.className = "cp-item";
 
     const dist = getTraveledDistance(wp.routeIndex, latlngs) / 1000;
+    const remain = getRemainingDistance(wp.routeIndex, latlngs) / 1000;
     const planned = calcPlannedArrival(wp.routeIndex);
 
     let predText = "";
@@ -2196,7 +2197,12 @@ function renderCheckpointList() {
     }
 
     div.innerHTML = `
-      <div class="cp-name">${wp.name}（${dist.toFixed(1)}km）</div>
+      <div class="cp-name">
+        ${wp.name}
+        （${dist.toFixed(1)}km
+        ${startTime ? ` / 残 ${remain.toFixed(1)}km` : ""}
+        ）
+      </div>
       <div class="cp-time">
         予定：${planned}
         ${startTime ? `<br>予測：${predText} <span style="color:${color}">${diffText}</span>` : ""}
@@ -2210,8 +2216,9 @@ function renderCheckpointList() {
   // ③ ゴール追加
   // =========================
   const goalIndex = latlngs.length - 1;
-
   const planned = calcPlannedArrival(goalIndex);
+  const totalDist = getTotalDistance(latlngs) / 1000;
+  const remainDist = getRemainingDistance(currentIndex, latlngs) / 1000;
 
   let predText = "";
   let diffText = "";
@@ -2239,7 +2246,12 @@ function renderCheckpointList() {
   goalDiv.style.border = "2px solid orange";
 
   goalDiv.innerHTML = `
-    <div class="cp-name">🏁 ゴール</div>
+    <div class="cp-name">
+      🏁 ゴール
+      （${totalDist.toFixed(1)}km
+      ${startTime ? ` / 残 ${remainDist.toFixed(1)}km` : ""}
+      ）
+    </div>    
     <div class="cp-time">
       予定：${planned}
       ${startTime ? `<br>予測：${predText} <span style="color:${color}">${diffText}</span>` : ""}
